@@ -22,15 +22,10 @@ jobs:
           distribution: 'temurin'
           java-version: '17'
 
-      - name: Cache Gradle Dependencies
-        uses: actions/cache@v4
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@v3
         with:
-          path: |
-            ~/.gradle/caches
-            ~/.gradle/wrapper
-          key: ${{ runner.os }}-gradle-${{ hashFiles('**/*.gradle*', '**/gradle-wrapper.properties') }}
-          restore-keys: |
-            ${{ runner.os }}-gradle-
+          gradle-version: 8.7
 
       - name: Generate Debug Keystore
         run: |
@@ -43,11 +38,8 @@ jobs:
             -validity 365000 \
             -dname "CN=Android Debug,O=Android,C=US"
 
-      - name: Grant Execute Permission for gradlew
-        run: chmod +x ./gradlew
-
       - name: Build Debug APK
-        run: ./gradlew assembleDebug --stacktrace
+        run: gradle assembleDebug --stacktrace
 
       - name: Upload Debug APK
         uses: actions/upload-artifact@v4
