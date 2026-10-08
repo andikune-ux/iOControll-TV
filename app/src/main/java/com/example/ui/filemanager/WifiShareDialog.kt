@@ -1,4 +1,4 @@
-package com.example.ui.filemanager
+package dev.andikuneiocontroll.ui.filemanager
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -51,18 +51,18 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
-import com.example.model.DevicePeer
-import com.example.model.ServerConfig
-import com.example.ui.theme.DarkBgCard
-import com.example.ui.theme.DarkBgCardElevated
-import com.example.ui.theme.DarkBgPrimary
-import com.example.ui.theme.StabiloCyan
-import com.example.ui.theme.StabiloLime
-import com.example.ui.theme.StabiloPink
-import com.example.ui.theme.StabiloYellow
-import com.example.ui.theme.TextMuted
-import com.example.ui.theme.TextPrimary
-import com.example.ui.theme.TextSecondary
+import dev.andikuneiocontroll.model.DevicePeer
+import dev.andikuneiocontroll.model.ServerConfig
+import dev.andikuneiocontroll.ui.theme.DarkBgCard
+import dev.andikuneiocontroll.ui.theme.DarkBgCardElevated
+import dev.andikuneiocontroll.ui.theme.DarkBgPrimary
+import dev.andikuneiocontroll.ui.theme.StabiloCyan
+import dev.andikuneiocontroll.ui.theme.StabiloLime
+import dev.andikuneiocontroll.ui.theme.StabiloPink
+import dev.andikuneiocontroll.ui.theme.StabiloYellow
+import dev.andikuneiocontroll.ui.theme.TextMuted
+import dev.andikuneiocontroll.ui.theme.TextPrimary
+import dev.andikuneiocontroll.ui.theme.TextSecondary
 
 @Composable
 fun WifiShareDialog(

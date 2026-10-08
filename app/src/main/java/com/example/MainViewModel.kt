@@ -1,4 +1,4 @@
-package com.example
+package dev.andikuneiocontroll
 
 import android.app.Application
 import android.content.Context
@@ -8,18 +8,18 @@ import android.os.Environment
 import android.widget.Toast
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
-import com.example.filemanager.FileManagerHelper
-import com.example.model.ActiveViewer
-import com.example.model.DevicePeer
-import com.example.model.FileCategory
-import com.example.model.FileItem
-import com.example.model.ServerConfig
-import com.example.model.StorageCategoryInfo
-import com.example.remote.RemoteClient
-import com.example.remote.RemoteSocketServer
-import com.example.server.DiscoveryManager
-import com.example.server.WifiFileServerService
-import com.example.server.WifiHttpServer
+import dev.andikuneiocontroll.filemanager.FileManagerHelper
+import dev.andikuneiocontroll.model.ActiveViewer
+import dev.andikuneiocontroll.model.DevicePeer
+import dev.andikuneiocontroll.model.FileCategory
+import dev.andikuneiocontroll.model.FileItem
+import dev.andikuneiocontroll.model.ServerConfig
+import dev.andikuneiocontroll.model.StorageCategoryInfo
+import dev.andikuneiocontroll.remote.RemoteClient
+import dev.andikuneiocontroll.remote.RemoteSocketServer
+import dev.andikuneiocontroll.server.DiscoveryManager
+import dev.andikuneiocontroll.server.WifiFileServerService
+import dev.andikuneiocontroll.server.WifiHttpServer
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow

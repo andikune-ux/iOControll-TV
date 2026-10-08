@@ -1,4 +1,4 @@
-package com.example.ui.filemanager
+package dev.andikuneiocontroll.ui.filemanager
 
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -41,7 +41,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
-import com.example.model.FileItem
+import dev.andikuneiocontroll.model.FileItem
 
 @Composable
 fun FileContextMenuDialog(

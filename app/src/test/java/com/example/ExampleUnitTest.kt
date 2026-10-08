@@ -1,4 +1,4 @@
-package com.example
+package dev.andikuneiocontroll
 
 import org.junit.Assert.*
 import org.junit.Test

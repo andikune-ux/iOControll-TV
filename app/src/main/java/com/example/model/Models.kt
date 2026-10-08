@@ -1,4 +1,4 @@
-package com.example.model
+package dev.andikuneiocontroll.model
 
 import java.io.File
 

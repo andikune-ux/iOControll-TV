@@ -1,10 +1,10 @@
-package com.example.server
+package dev.andikuneiocontroll.server
 
 import android.content.Context
 import android.net.nsd.NsdManager
 import android.net.nsd.NsdServiceInfo
 import android.os.Build
-import com.example.model.DevicePeer
+import dev.andikuneiocontroll.model.DevicePeer
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job

@@ -1,4 +1,4 @@
-package com.example.remote
+package dev.andikuneiocontroll.remote
 
 import android.accessibilityservice.AccessibilityService
 import android.accessibilityservice.GestureDescription

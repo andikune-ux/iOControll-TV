@@ -1,4 +1,4 @@
-package com.example.ui.theme
+package dev.andikuneiocontroll.ui.theme
 
 import android.os.Build
 import androidx.compose.material3.MaterialTheme

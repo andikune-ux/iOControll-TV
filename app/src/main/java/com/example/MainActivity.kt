@@ -1,4 +1,4 @@
-package com.example
+package dev.andikuneiocontroll
 
 import android.os.Bundle
 import androidx.activity.ComponentActivity
@@ -9,8 +9,8 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.Surface
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
-import com.example.ui.MainScreen
-import com.example.ui.theme.MyApplicationTheme
+import dev.andikuneiocontroll.ui.MainScreen
+import dev.andikuneiocontroll.ui.theme.MyApplicationTheme
 
 class MainActivity : ComponentActivity() {
 

@@ -1,4 +1,4 @@
-package com.example
+package dev.andikuneiocontroll
 
 import android.content.Context
 import androidx.test.core.app.ApplicationProvider

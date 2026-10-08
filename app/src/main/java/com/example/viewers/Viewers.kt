@@ -1,4 +1,4 @@
-package com.example.viewers
+package dev.andikuneiocontroll.viewers
 
 import android.net.Uri
 import android.view.ViewGroup
@@ -65,7 +65,7 @@ import androidx.media3.common.util.UnstableApi
 import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.ui.PlayerView
 import coil.compose.AsyncImage
-import com.example.model.StorageCategoryInfo
+import dev.andikuneiocontroll.model.StorageCategoryInfo
 import java.io.File
 
 @OptIn(UnstableApi::class)

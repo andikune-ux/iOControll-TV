@@ -1,9 +1,9 @@
-package com.example.server
+package dev.andikuneiocontroll.server
 
 import android.content.Context
 import android.net.wifi.WifiManager
 import android.text.format.Formatter
-import com.example.model.ServerConfig
+import dev.andikuneiocontroll.model.ServerConfig
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job

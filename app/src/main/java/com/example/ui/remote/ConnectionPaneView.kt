@@ -1,4 +1,4 @@
-package com.example.ui.remote
+package dev.andikuneiocontroll.ui.remote
 
 import android.widget.Toast
 import androidx.compose.foundation.background
@@ -60,18 +60,18 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.example.remote.RemoteClient
-import com.example.remote.RemoteSocketServer
-import com.example.ui.theme.DarkBgCard
-import com.example.ui.theme.DarkBgCardElevated
-import com.example.ui.theme.DarkBgPrimary
-import com.example.ui.theme.StabiloCyan
-import com.example.ui.theme.StabiloLime
-import com.example.ui.theme.StabiloPink
-import com.example.ui.theme.StabiloYellow
-import com.example.ui.theme.TextMuted
-import com.example.ui.theme.TextPrimary
-import com.example.ui.theme.TextSecondary
+import dev.andikuneiocontroll.remote.RemoteClient
+import dev.andikuneiocontroll.remote.RemoteSocketServer
+import dev.andikuneiocontroll.ui.theme.DarkBgCard
+import dev.andikuneiocontroll.ui.theme.DarkBgCardElevated
+import dev.andikuneiocontroll.ui.theme.DarkBgPrimary
+import dev.andikuneiocontroll.ui.theme.StabiloCyan
+import dev.andikuneiocontroll.ui.theme.StabiloLime
+import dev.andikuneiocontroll.ui.theme.StabiloPink
+import dev.andikuneiocontroll.ui.theme.StabiloYellow
+import dev.andikuneiocontroll.ui.theme.TextMuted
+import dev.andikuneiocontroll.ui.theme.TextPrimary
+import dev.andikuneiocontroll.ui.theme.TextSecondary
 
 @Composable
 fun ConnectionPaneView(

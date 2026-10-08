@@ -1,4 +1,4 @@
-package com.example.ui.permissions
+package dev.andikuneiocontroll.ui.permissions
 
 import android.Manifest
 import android.content.Context

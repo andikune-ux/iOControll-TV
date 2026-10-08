@@ -1,4 +1,4 @@
-package com.example.filemanager
+package dev.andikuneiocontroll.filemanager
 
 import android.content.Context
 import android.content.Intent
@@ -6,9 +6,9 @@ import android.content.pm.ApplicationInfo
 import android.content.pm.PackageManager
 import android.os.Environment
 import androidx.core.content.FileProvider
-import com.example.model.FileCategory
-import com.example.model.FileItem
-import com.example.model.StorageCategoryInfo
+import dev.andikuneiocontroll.model.FileCategory
+import dev.andikuneiocontroll.model.FileItem
+import dev.andikuneiocontroll.model.StorageCategoryInfo
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import java.io.File
