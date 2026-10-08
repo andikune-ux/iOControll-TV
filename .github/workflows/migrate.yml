@@ -1,0 +1,31 @@
+name: Migrate
+
+on:
+  workflow_dispatch:
+
+jobs:
+  migrate:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Migrate
+        run: |
+          find app/src -name "*.kt" -exec sed -i \
+            -e 's/^package com\.example/package dev.andikuneiocontroll/' \
+            -e 's/^import com\.example/import dev.andikuneiocontroll/' \
+            -e 's/"com\.example\./"dev.andikuneiocontroll./g' {} +
+          
+          sed -i 's|namespace = "com.example"|namespace = "dev.andikuneiocontroll"|' app/build.gradle.kts
+
+      - name: Push
+        run: |
+          git config user.name "bot"
+          git config user.email "bot@github.com"
+          git add -A
+          git commit -m "Migrate namespace" || echo "Tidak ada perubahan"
+          git push
