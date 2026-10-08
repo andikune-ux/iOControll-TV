@@ -66,6 +66,7 @@ import dev.andikuneiocontroll.filemanager.FileManagerHelper
 import dev.andikuneiocontroll.model.ActiveViewer
 import dev.andikuneiocontroll.model.FileItem
 import dev.andikuneiocontroll.ui.components.MobileModeView
+import dev.andikuneiocontroll.ui.components.RemoteTvDialog
 import dev.andikuneiocontroll.ui.filemanager.BatchRenameDialog
 import dev.andikuneiocontroll.ui.filemanager.FileContextMenuDialog
 import dev.andikuneiocontroll.ui.filemanager.FilePaneView
@@ -137,6 +138,7 @@ fun MainScreen(viewModel: MainViewModel) {
     var showBatchRenameDialog by remember { mutableStateOf(false) }
     var showLauncherOverlay by remember { mutableStateOf(false) }
     var showConnectionDialog by remember { mutableStateOf(false) }
+    var showRemoteDialog by remember { mutableStateOf(false) }
 
     val pane1SelectedCount = remember(pane1Items) { pane1Items.count { it.isSelected } }
     val pane2SelectedCount = remember(pane2Items) { pane2Items.count { it.isSelected } }
@@ -227,10 +229,10 @@ fun MainScreen(viewModel: MainViewModel) {
                             }
 
                             IconButton(
-                                onClick = { showConnectionDialog = true },
+                                onClick = { showRemoteDialog = true },
                                 modifier = Modifier.padding(bottom = 14.dp)
                             ) {
-                                Icon(Icons.Default.Tv, "Remote", tint = StabiloPink, modifier = Modifier.size(26.dp))
+                                Icon(Icons.Default.Tv, "Remote TV", tint = StabiloPink, modifier = Modifier.size(26.dp))
                             }
                         }
 
@@ -334,6 +336,8 @@ fun MainScreen(viewModel: MainViewModel) {
     }
 
     // ============ OVERLAYS & DIALOGS ============
+
+    // Dialog Info Koneksi
     if (showConnectionDialog) {
         ConnectionInfoDialog(
             isConnected = isServerRunning,
@@ -341,13 +345,22 @@ fun MainScreen(viewModel: MainViewModel) {
             peerCount = discoveredPeers.size,
             onOpenRemote = {
                 showConnectionDialog = false
-                Toast.makeText(context, "Fitur Remote TV segera hadir", Toast.LENGTH_SHORT).show()
+                showRemoteDialog = true
             },
             onOpenWifiSettings = {
                 showConnectionDialog = false
                 viewModel.setShowWifiShareDialog(true)
             },
             onDismiss = { showConnectionDialog = false }
+        )
+    }
+
+    // Dialog Remote TV
+    if (showRemoteDialog) {
+        RemoteTvDialog(
+            remoteClient = viewModel.remoteClient,
+            remoteServer = viewModel.remoteServer,
+            onDismiss = { showRemoteDialog = false }
         )
     }
 
@@ -489,7 +502,7 @@ fun ConnectionInfoDialog(
                 ) {
                     Icon(Icons.Default.Tv, null, tint = StabiloPink)
                     Spacer(modifier = Modifier.width(8.dp))
-                    Text("Remote TV", color = TextPrimary)
+                    Text("Buka Remote TV", color = TextPrimary)
                 }
             }
         }
