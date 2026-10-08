@@ -1,0 +1,6 @@
+{
+  "name": "iOControll Tv",
+  "description": "Dual-pane Wi-Fi File Manager (X-plore style) and TV Remote Controller (Zank Remote style) with media streaming, D-Pad, touchpad, and air mouse.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
