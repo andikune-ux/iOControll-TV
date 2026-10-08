@@ -173,7 +173,6 @@ fun MainScreen(viewModel: MainViewModel) {
                 .padding(innerPadding)
         ) {
             if (isLandscape) {
-                // ============ MODE TV (LANDSCAPE) - 2 PANE ============
                 Box(modifier = Modifier.fillMaxSize()) {
                     Row(modifier = Modifier.fillMaxSize()) {
                         Box(modifier = Modifier.weight(1f)) {
@@ -276,7 +275,6 @@ fun MainScreen(viewModel: MainViewModel) {
                     }
                 }
             } else {
-                // ============ MODE HP (PORTRAIT) - TOOLBAR DINAMIS ============
                 MobileModeView(
                     isLeftPaneVisible = isLeftPaneVisible,
                     onTogglePane = { isLeftPaneVisible = !isLeftPaneVisible },
@@ -336,8 +334,6 @@ fun MainScreen(viewModel: MainViewModel) {
     }
 
     // ============ OVERLAYS & DIALOGS ============
-
-    // Dialog Info Koneksi
     if (showConnectionDialog) {
         ConnectionInfoDialog(
             isConnected = isServerRunning,
@@ -355,7 +351,6 @@ fun MainScreen(viewModel: MainViewModel) {
         )
     }
 
-    // Dialog Remote TV
     if (showRemoteDialog) {
         RemoteTvDialog(
             remoteClient = viewModel.remoteClient,
@@ -373,14 +368,20 @@ fun MainScreen(viewModel: MainViewModel) {
         )
     }
 
+    // Dialog Server WiFi (POPUP KECIL)
     if (showWifiDialog) {
         WifiShareDialog(
             serverConfig = serverConfig,
             serverUrl = serverUrl,
             discoveredPeers = discoveredPeers,
-            onToggleServer = { viewModel.toggleServer(it) },
-            onConnectPeer = { peer -> viewModel.loadPane2("http://${peer.ip}:${peer.port}"); viewModel.setShowWifiShareDialog(false) },
-            onSavePeer = { _, label, _, _ -> Toast.makeText(context, "Perangkat $label tersimpan", Toast.LENGTH_SHORT).show() },
+            onToggleServer = { config -> viewModel.toggleServer(config) },
+            onConnectPeer = { peer ->
+                // Konek ke peer & langsung tampilkan penyimpanan peer di pane kanan
+                viewModel.loadPane2("http://${peer.ip}:${peer.port}")
+                viewModel.setShowWifiShareDialog(false)
+                Toast.makeText(context, "Terhubung ke ${peer.name.ifBlank { peer.ip }}", Toast.LENGTH_SHORT).show()
+            },
+            onSavePeer = { _, _, _, _ -> },
             onDismiss = { viewModel.setShowWifiShareDialog(false) }
         )
     }
