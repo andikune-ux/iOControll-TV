@@ -1,7 +1,5 @@
 package dev.andikuneiocontroll.ui
 
-import android.app.Activity
-import android.content.pm.ActivityInfo
 import android.content.res.Configuration
 import android.os.Build
 import android.os.Environment
@@ -32,12 +30,10 @@ import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.ContentCopy
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.DriveFileMove
-import androidx.compose.material.icons.filled.Fullscreen
 import androidx.compose.material.icons.filled.FullscreenExit
 import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.PieChart
 import androidx.compose.material.icons.filled.Settings
-import androidx.compose.material.icons.filled.SwapHoriz
 import androidx.compose.material.icons.filled.Tv
 import androidx.compose.material.icons.filled.Wifi
 import androidx.compose.material3.Button
@@ -69,6 +65,7 @@ import dev.andikuneiocontroll.MainViewModel
 import dev.andikuneiocontroll.filemanager.FileManagerHelper
 import dev.andikuneiocontroll.model.ActiveViewer
 import dev.andikuneiocontroll.model.FileItem
+import dev.andikuneiocontroll.ui.components.MobileModeView
 import dev.andikuneiocontroll.ui.filemanager.BatchRenameDialog
 import dev.andikuneiocontroll.ui.filemanager.FileContextMenuDialog
 import dev.andikuneiocontroll.ui.filemanager.FilePaneView
@@ -97,7 +94,6 @@ import dev.andikuneiocontroll.viewers.VideoPlayerDialog
 @Composable
 fun MainScreen(viewModel: MainViewModel) {
     val context = LocalContext.current
-    val activity = context as? Activity
     val configuration = LocalConfiguration.current
 
     var hasStoragePermission by remember {
@@ -122,11 +118,8 @@ fun MainScreen(viewModel: MainViewModel) {
     }
 
     val isLandscape = configuration.orientation == Configuration.ORIENTATION_LANDSCAPE
-
-    // State untuk Mode HP: default = Pane Kiri
     var isLeftPaneVisible by remember { mutableStateOf(true) }
 
-    // Observables
     val pane1Path by viewModel.pane1Path.collectAsState()
     val pane1Items by viewModel.pane1Items.collectAsState()
     val pane2Path by viewModel.pane2Path.collectAsState()
@@ -178,10 +171,9 @@ fun MainScreen(viewModel: MainViewModel) {
                 .padding(innerPadding)
         ) {
             if (isLandscape) {
-                // ============ MODE TV (LANDSCAPE) - 2 PANE FILE MANAGER ============
+                // ============ MODE TV (LANDSCAPE) - 2 PANE ============
                 Box(modifier = Modifier.fillMaxSize()) {
                     Row(modifier = Modifier.fillMaxSize()) {
-                        // Pane Kiri
                         Box(modifier = Modifier.weight(1f)) {
                             FilePaneView(
                                 paneTitle = "PANE KIRI • PENYIMPANAN INTERNAL",
@@ -206,7 +198,6 @@ fun MainScreen(viewModel: MainViewModel) {
                             )
                         }
 
-                        // Toolbar Tengah (Garis Pembatas Vertikal)
                         Column(
                             modifier = Modifier
                                 .width(60.dp)
@@ -216,73 +207,33 @@ fun MainScreen(viewModel: MainViewModel) {
                             horizontalAlignment = Alignment.CenterHorizontally,
                             verticalArrangement = Arrangement.SpaceBetween
                         ) {
-                            // Icon Gerigi (Atas)
                             IconButton(
                                 onClick = { viewModel.setShowWifiShareDialog(true) },
                                 modifier = Modifier.padding(top = 12.dp)
                             ) {
-                                Icon(
-                                    Icons.Default.Settings,
-                                    contentDescription = "Pengaturan",
-                                    tint = StabiloCyan,
-                                    modifier = Modifier.size(26.dp)
-                                )
+                                Icon(Icons.Default.Settings, "Pengaturan", tint = StabiloCyan, modifier = Modifier.size(26.dp))
                             }
 
-                            // Tengah: D-Pad, Fullscreen, Status Koneksi
                             Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                                IconButton(
-                                    onClick = {
-                                        viewModel.remoteClient.sendCommand("DPAD_RIGHT")
-                                    }
-                                ) {
-                                    Icon(
-                                        Icons.AutoMirrored.Filled.ArrowForward,
-                                        contentDescription = "Panah D-Pad",
-                                        tint = StabiloLime,
-                                        modifier = Modifier.size(26.dp)
-                                    )
+                                IconButton(onClick = { viewModel.remoteClient.sendCommand("DPAD_RIGHT") }) {
+                                    Icon(Icons.AutoMirrored.Filled.ArrowForward, "D-Pad", tint = StabiloLime, modifier = Modifier.size(26.dp))
                                 }
-
                                 Spacer(modifier = Modifier.height(12.dp))
-
-                                IconButton(
-                                    onClick = {
-                                        activity?.requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_PORTRAIT
-                                    }
-                                ) {
-                                    Icon(
-                                        Icons.Default.FullscreenExit,
-                                        contentDescription = "Fullscreen Toggle",
-                                        tint = StabiloYellow,
-                                        modifier = Modifier.size(26.dp)
-                                    )
+                                IconButton(onClick = { showConnectionDialog = true }) {
+                                    Icon(Icons.Default.FullscreenExit, "Fullscreen", tint = StabiloYellow, modifier = Modifier.size(26.dp))
                                 }
-
                                 Spacer(modifier = Modifier.height(12.dp))
-
-                                // Indikator Status Koneksi (Dot)
-                                ConnectionStatusDot(
-                                    isConnected = isServerRunning,
-                                    onClick = { showConnectionDialog = true }
-                                )
+                                ConnectionStatusDot(isConnected = isServerRunning, onClick = { showConnectionDialog = true })
                             }
 
-                            // Icon Remote (Bawah)
                             IconButton(
                                 onClick = { showConnectionDialog = true },
                                 modifier = Modifier.padding(bottom = 14.dp)
                             ) {
-                                Icon(
-                                    Icons.Default.Tv,
-                                    contentDescription = "Remote TV",
-                                    tint = StabiloPink,
-                                    modifier = Modifier.size(26.dp)
-                                )
+                                Icon(Icons.Default.Tv, "Remote", tint = StabiloPink, modifier = Modifier.size(26.dp))
                             }
                         }
 
-                        // Pane Kanan (File Manager - pane2)
                         Box(modifier = Modifier.weight(1f)) {
                             FilePaneView(
                                 paneTitle = "PANE KANAN • PENYIMPANAN INTERNAL",
@@ -308,40 +259,30 @@ fun MainScreen(viewModel: MainViewModel) {
                         }
                     }
 
-                    // Overlay Icon Launcher di sudut kanan atas
-                    Box(
-                        modifier = Modifier
-                            .align(Alignment.TopEnd)
-                            .padding(16.dp)
-                    ) {
+                    Box(modifier = Modifier.align(Alignment.TopEnd).padding(16.dp)) {
                         Surface(
                             shape = CircleShape,
                             color = DarkBgCardElevated,
                             border = BorderStroke(1.5.dp, StabiloLime),
                             shadowElevation = 8.dp,
-                            modifier = Modifier
-                                .size(42.dp)
-                                .clip(CircleShape)
-                                .clickable { showLauncherOverlay = true }
+                            modifier = Modifier.size(42.dp).clip(CircleShape).clickable { showLauncherOverlay = true }
                         ) {
                             Box(contentAlignment = Alignment.Center) {
-                                Icon(
-                                    Icons.Default.Apps,
-                                    contentDescription = "Launcher Overlay",
-                                    tint = StabiloLime,
-                                    modifier = Modifier.size(22.dp)
-                                )
+                                Icon(Icons.Default.Apps, "Launcher", tint = StabiloLime, modifier = Modifier.size(22.dp))
                             }
                         }
                     }
                 }
             } else {
-                // ============ MODE HP (PORTRAIT) - 1 PANE FILE MANAGER ============
-                Row(modifier = Modifier.fillMaxSize()) {
-                    // Area Konten Pane
-                    Box(modifier = Modifier.weight(1f)) {
+                // ============ MODE HP (PORTRAIT) - TOOLBAR DINAMIS ============
+                MobileModeView(
+                    isLeftPaneVisible = isLeftPaneVisible,
+                    onTogglePane = { isLeftPaneVisible = !isLeftPaneVisible },
+                    onOpenSettings = { viewModel.setShowWifiShareDialog(true) },
+                    onOpenConnectionDialog = { showConnectionDialog = true },
+                    isConnected = isServerRunning,
+                    paneContent = {
                         if (isLeftPaneVisible) {
-                            // Pane Kiri
                             FilePaneView(
                                 paneTitle = "PANE KIRI (MODE HP) • FILE MANAGER",
                                 currentPath = pane1Path,
@@ -364,7 +305,6 @@ fun MainScreen(viewModel: MainViewModel) {
                                 modifier = Modifier.fillMaxSize()
                             )
                         } else {
-                            // Pane Kanan
                             FilePaneView(
                                 paneTitle = "PANE KANAN (MODE HP) • FILE MANAGER",
                                 currentPath = pane2Path,
@@ -388,91 +328,12 @@ fun MainScreen(viewModel: MainViewModel) {
                             )
                         }
                     }
-
-                    // Toolbar Kanan (Dropdown)
-                    Column(
-                        modifier = Modifier
-                            .width(50.dp)
-                            .fillMaxHeight()
-                            .background(DarkBgCard)
-                            .border(width = 1.dp, color = DarkDivider),
-                        horizontalAlignment = Alignment.CenterHorizontally,
-                        verticalArrangement = Arrangement.Center
-                    ) {
-                        // Icon Gerigi
-                        IconButton(
-                            onClick = { viewModel.setShowWifiShareDialog(true) }
-                        ) {
-                            Icon(
-                                Icons.Default.Settings,
-                                contentDescription = "Pengaturan",
-                                tint = StabiloCyan,
-                                modifier = Modifier.size(24.dp)
-                            )
-                        }
-
-                        Spacer(modifier = Modifier.height(18.dp))
-
-                        // Switch Pane
-                        IconButton(
-                            onClick = { isLeftPaneVisible = !isLeftPaneVisible }
-                        ) {
-                            Icon(
-                                Icons.Default.SwapHoriz,
-                                contentDescription = "Switch Pane",
-                                tint = StabiloLime,
-                                modifier = Modifier.size(28.dp)
-                            )
-                        }
-
-                        Spacer(modifier = Modifier.height(18.dp))
-
-                        // Fullscreen (Paksa Landscape)
-                        IconButton(
-                            onClick = {
-                                activity?.requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE
-                            }
-                        ) {
-                            Icon(
-                                Icons.Default.Fullscreen,
-                                contentDescription = "Paksa Rotasi ke TV",
-                                tint = StabiloYellow,
-                                modifier = Modifier.size(28.dp)
-                            )
-                        }
-
-                        Spacer(modifier = Modifier.height(18.dp))
-
-                        // Indikator Status Koneksi
-                        ConnectionStatusDot(
-                            isConnected = isServerRunning,
-                            onClick = { showConnectionDialog = true }
-                        )
-
-                        Spacer(modifier = Modifier.height(18.dp))
-
-                        // Remote Icon
-                        IconButton(
-                            onClick = { showConnectionDialog = true }
-                        ) {
-                            Icon(
-                                Icons.Default.Tv,
-                                contentDescription = "Remote Control",
-                                tint = StabiloPink,
-                                modifier = Modifier.size(24.dp)
-                            )
-                        }
-                    }
-                }
+                )
             }
         }
     }
 
-    // ==========================================
-    // OVERLAYS & DIALOGS
-    // ==========================================
-
-    // Dialog Status Koneksi (Simple)
+    // ============ OVERLAYS & DIALOGS ============
     if (showConnectionDialog) {
         ConnectionInfoDialog(
             isConnected = isServerRunning,
@@ -480,7 +341,7 @@ fun MainScreen(viewModel: MainViewModel) {
             peerCount = discoveredPeers.size,
             onOpenRemote = {
                 showConnectionDialog = false
-                Toast.makeText(context, "Fitur Remote TV akan tersedia di update berikutnya", Toast.LENGTH_SHORT).show()
+                Toast.makeText(context, "Fitur Remote TV segera hadir", Toast.LENGTH_SHORT).show()
             },
             onOpenWifiSettings = {
                 showConnectionDialog = false
@@ -490,44 +351,27 @@ fun MainScreen(viewModel: MainViewModel) {
         )
     }
 
-    // Launcher Overlay Dialog
     if (showLauncherOverlay) {
         StabiloLauncherDialog(
-            onOpenApps = {
-                viewModel.loadPane1("APPLICATIONS")
-                showLauncherOverlay = false
-            },
-            onOpenDiskMap = {
-                viewModel.showDiskMap()
-                showLauncherOverlay = false
-            },
-            onOpenWifiShare = {
-                viewModel.setShowWifiShareDialog(true)
-                showLauncherOverlay = false
-            },
+            onOpenApps = { viewModel.loadPane1("APPLICATIONS"); showLauncherOverlay = false },
+            onOpenDiskMap = { viewModel.showDiskMap(); showLauncherOverlay = false },
+            onOpenWifiShare = { viewModel.setShowWifiShareDialog(true); showLauncherOverlay = false },
             onDismiss = { showLauncherOverlay = false }
         )
     }
 
-    // Wi-Fi File Sharing Dialog
     if (showWifiDialog) {
         WifiShareDialog(
             serverConfig = serverConfig,
             serverUrl = serverUrl,
             discoveredPeers = discoveredPeers,
             onToggleServer = { viewModel.toggleServer(it) },
-            onConnectPeer = { peer ->
-                viewModel.loadPane2("http://${peer.ip}:${peer.port}")
-                viewModel.setShowWifiShareDialog(false)
-            },
-            onSavePeer = { _, label, _, _ ->
-                Toast.makeText(context, "Perangkat $label tersimpan", Toast.LENGTH_SHORT).show()
-            },
+            onConnectPeer = { peer -> viewModel.loadPane2("http://${peer.ip}:${peer.port}"); viewModel.setShowWifiShareDialog(false) },
+            onSavePeer = { _, label, _, _ -> Toast.makeText(context, "Perangkat $label tersimpan", Toast.LENGTH_SHORT).show() },
             onDismiss = { viewModel.setShowWifiShareDialog(false) }
         )
     }
 
-    // Context Menu Dialog
     contextMenuItem?.let { item ->
         FileContextMenuDialog(
             item = item,
@@ -544,7 +388,6 @@ fun MainScreen(viewModel: MainViewModel) {
         )
     }
 
-    // Rename Dialog
     renameTargetItem?.let { item ->
         RenameDialog(
             initialName = item.name,
@@ -553,7 +396,6 @@ fun MainScreen(viewModel: MainViewModel) {
         )
     }
 
-    // Batch Rename Dialog
     if (showBatchRenameDialog) {
         BatchRenameDialog(
             fileCount = pane1SelectedCount,
@@ -562,7 +404,6 @@ fun MainScreen(viewModel: MainViewModel) {
         )
     }
 
-    // Active Viewers
     when (val viewer = activeViewer) {
         is ActiveViewer.Video -> VideoPlayerDialog(viewer.path, viewer.name, onDismiss = { viewModel.closeViewer() })
         is ActiveViewer.Image -> ImageViewerDialog(viewer.path, viewer.name, viewer.imageList, onDismiss = { viewModel.closeViewer() })
@@ -581,14 +422,8 @@ fun MainScreen(viewModel: MainViewModel) {
     }
 }
 
-// ==========================================
-// COMPONENT: Status Koneksi Dot (Kecil)
-// ==========================================
 @Composable
-fun ConnectionStatusDot(
-    isConnected: Boolean,
-    onClick: () -> Unit
-) {
+fun ConnectionStatusDot(isConnected: Boolean, onClick: () -> Unit) {
     val dotColor = if (isConnected) Color(0xFF22C55E) else TextMuted
     Box(
         modifier = Modifier
@@ -599,18 +434,10 @@ fun ConnectionStatusDot(
             .clickable(onClick = onClick),
         contentAlignment = Alignment.Center
     ) {
-        Box(
-            modifier = Modifier
-                .size(10.dp)
-                .clip(CircleShape)
-                .background(dotColor)
-        )
+        Box(modifier = Modifier.size(10.dp).clip(CircleShape).background(dotColor))
     }
 }
 
-// ==========================================
-// DIALOG: Info Status Koneksi
-// ==========================================
 @Composable
 fun ConnectionInfoDialog(
     isConnected: Boolean,
@@ -622,70 +449,37 @@ fun ConnectionInfoDialog(
 ) {
     Dialog(onDismissRequest = onDismiss) {
         Card(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(16.dp),
+            modifier = Modifier.fillMaxWidth().padding(16.dp),
             colors = CardDefaults.cardColors(containerColor = DarkBgCard),
             border = BorderStroke(1.dp, StabiloCyan.copy(alpha = 0.5f)),
             shape = RoundedCornerShape(16.dp)
         ) {
             Column(modifier = Modifier.padding(20.dp)) {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Text(
-                        "Status Koneksi",
-                        fontWeight = FontWeight.Bold,
-                        fontSize = 16.sp,
-                        color = StabiloCyan
-                    )
-                    IconButton(onClick = onDismiss) {
-                        Icon(Icons.Default.Close, contentDescription = "Tutup", tint = TextSecondary)
-                    }
+                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
+                    Text("Status Koneksi", fontWeight = FontWeight.Bold, fontSize = 16.sp, color = StabiloCyan)
+                    IconButton(onClick = onDismiss) { Icon(Icons.Default.Close, "Tutup", tint = TextSecondary) }
                 }
-
                 Spacer(modifier = Modifier.height(12.dp))
-
                 Row(verticalAlignment = Alignment.CenterVertically) {
-                    Box(
-                        modifier = Modifier
-                            .size(12.dp)
-                            .clip(CircleShape)
-                            .background(if (isConnected) Color(0xFF22C55E) else TextMuted)
-                    )
+                    Box(modifier = Modifier.size(12.dp).clip(CircleShape).background(if (isConnected) Color(0xFF22C55E) else TextMuted))
                     Spacer(modifier = Modifier.width(10.dp))
-                    Text(
-                        if (isConnected) "Server Aktif" else "Belum Terhubung",
-                        color = TextPrimary,
-                        fontWeight = FontWeight.Bold,
-                        fontSize = 14.sp
-                    )
+                    Text(if (isConnected) "Server Aktif" else "Belum Terhubung", color = TextPrimary, fontWeight = FontWeight.Bold, fontSize = 14.sp)
                 }
-
                 Spacer(modifier = Modifier.height(8.dp))
-
-                if (isConnected && serverUrl.isNotEmpty()) {
-                    Text("URL: $serverUrl", color = TextSecondary, fontSize = 12.sp)
-                }
+                if (isConnected && serverUrl.isNotEmpty()) Text("URL: $serverUrl", color = TextSecondary, fontSize = 12.sp)
                 Text("Perangkat ditemukan: $peerCount", color = TextSecondary, fontSize = 12.sp)
-
                 Spacer(modifier = Modifier.height(16.dp))
-
                 Button(
                     onClick = onOpenWifiSettings,
                     colors = ButtonDefaults.buttonColors(containerColor = StabiloLime),
                     shape = RoundedCornerShape(10.dp),
                     modifier = Modifier.fillMaxWidth().height(44.dp)
                 ) {
-                    Icon(Icons.Default.Wifi, contentDescription = null, tint = Color.Black)
+                    Icon(Icons.Default.Wifi, null, tint = Color.Black)
                     Spacer(modifier = Modifier.width(8.dp))
                     Text("Buka Server WiFi", color = Color.Black, fontWeight = FontWeight.Bold)
                 }
-
                 Spacer(modifier = Modifier.height(8.dp))
-
                 Button(
                     onClick = onOpenRemote,
                     colors = ButtonDefaults.buttonColors(containerColor = DarkBgCardElevated),
@@ -693,7 +487,7 @@ fun ConnectionInfoDialog(
                     shape = RoundedCornerShape(10.dp),
                     modifier = Modifier.fillMaxWidth().height(44.dp)
                 ) {
-                    Icon(Icons.Default.Tv, contentDescription = null, tint = StabiloPink)
+                    Icon(Icons.Default.Tv, null, tint = StabiloPink)
                     Spacer(modifier = Modifier.width(8.dp))
                     Text("Remote TV", color = TextPrimary)
                 }
@@ -715,65 +509,35 @@ fun StabiloMultiSelectionBar(
     onClear: () -> Unit
 ) {
     Card(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(8.dp),
+        modifier = Modifier.fillMaxWidth().padding(8.dp),
         colors = CardDefaults.cardColors(containerColor = DarkBgCardElevated),
         border = BorderStroke(1.dp, StabiloLime.copy(alpha = 0.5f)),
         shape = RoundedCornerShape(14.dp)
     ) {
         Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 10.dp, vertical = 6.dp),
+            modifier = Modifier.fillMaxWidth().padding(horizontal = 10.dp, vertical = 6.dp),
             horizontalArrangement = Arrangement.SpaceEvenly,
             verticalAlignment = Alignment.CenterVertically
         ) {
-            Button(
-                onClick = onCopy,
-                colors = ButtonDefaults.buttonColors(containerColor = StabiloLime),
-                shape = RoundedCornerShape(8.dp)
-            ) {
-                Icon(Icons.Default.ContentCopy, contentDescription = null, tint = Color.Black, modifier = Modifier.size(16.dp))
+            Button(onClick = onCopy, colors = ButtonDefaults.buttonColors(containerColor = StabiloLime), shape = RoundedCornerShape(8.dp)) {
+                Icon(Icons.Default.ContentCopy, null, tint = Color.Black, modifier = Modifier.size(16.dp))
                 Spacer(modifier = Modifier.width(4.dp))
                 Text("Salin", color = Color.Black, fontWeight = FontWeight.Bold, fontSize = 12.sp)
             }
-
-            Button(
-                onClick = onMove,
-                colors = ButtonDefaults.buttonColors(containerColor = StabiloCyan),
-                shape = RoundedCornerShape(8.dp)
-            ) {
-                Icon(Icons.Default.DriveFileMove, contentDescription = null, tint = Color.Black, modifier = Modifier.size(16.dp))
+            Button(onClick = onMove, colors = ButtonDefaults.buttonColors(containerColor = StabiloCyan), shape = RoundedCornerShape(8.dp)) {
+                Icon(Icons.Default.DriveFileMove, null, tint = Color.Black, modifier = Modifier.size(16.dp))
                 Spacer(modifier = Modifier.width(4.dp))
                 Text("Pindah", color = Color.Black, fontWeight = FontWeight.Bold, fontSize = 12.sp)
             }
-
-            Button(
-                onClick = onWifiShare,
-                colors = ButtonDefaults.buttonColors(containerColor = StabiloYellow),
-                shape = RoundedCornerShape(8.dp)
-            ) {
-                Icon(Icons.Default.Wifi, contentDescription = null, tint = Color.Black, modifier = Modifier.size(16.dp))
+            Button(onClick = onWifiShare, colors = ButtonDefaults.buttonColors(containerColor = StabiloYellow), shape = RoundedCornerShape(8.dp)) {
+                Icon(Icons.Default.Wifi, null, tint = Color.Black, modifier = Modifier.size(16.dp))
                 Spacer(modifier = Modifier.width(4.dp))
                 Text("WiFi", color = Color.Black, fontWeight = FontWeight.Bold, fontSize = 12.sp)
             }
-
-            IconButton(onClick = onCompress) {
-                Icon(Icons.Default.Archive, contentDescription = "Zip", tint = StabiloCyan)
-            }
-
-            IconButton(onClick = onVault) {
-                Icon(Icons.Default.Lock, contentDescription = "Vault", tint = StabiloYellow)
-            }
-
-            IconButton(onClick = onDelete) {
-                Icon(Icons.Default.Delete, contentDescription = "Hapus", tint = StabiloPink)
-            }
-
-            IconButton(onClick = onClear) {
-                Icon(Icons.Default.Close, contentDescription = "Batal", tint = TextSecondary)
-            }
+            IconButton(onClick = onCompress) { Icon(Icons.Default.Archive, "Zip", tint = StabiloCyan) }
+            IconButton(onClick = onVault) { Icon(Icons.Default.Lock, "Vault", tint = StabiloYellow) }
+            IconButton(onClick = onDelete) { Icon(Icons.Default.Delete, "Hapus", tint = StabiloPink) }
+            IconButton(onClick = onClear) { Icon(Icons.Default.Close, "Batal", tint = TextSecondary) }
         }
     }
 }
@@ -787,68 +551,31 @@ fun StabiloLauncherDialog(
 ) {
     Dialog(onDismissRequest = onDismiss) {
         Card(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(16.dp),
+            modifier = Modifier.fillMaxWidth().padding(16.dp),
             colors = CardDefaults.cardColors(containerColor = DarkBgCard),
             border = BorderStroke(1.dp, StabiloLime.copy(alpha = 0.5f)),
             shape = RoundedCornerShape(16.dp)
         ) {
             Column(modifier = Modifier.padding(20.dp)) {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Text(
-                        "Launcher Overlay iOControll",
-                        fontWeight = FontWeight.Bold,
-                        fontSize = 16.sp,
-                        color = StabiloLime
-                    )
-                    IconButton(onClick = onDismiss) {
-                        Icon(Icons.Default.Close, contentDescription = "Tutup", tint = TextSecondary)
-                    }
+                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
+                    Text("Launcher Overlay iOControll", fontWeight = FontWeight.Bold, fontSize = 16.sp, color = StabiloLime)
+                    IconButton(onClick = onDismiss) { Icon(Icons.Default.Close, "Tutup", tint = TextSecondary) }
                 }
-
                 Spacer(modifier = Modifier.height(16.dp))
-
-                Button(
-                    onClick = onOpenApps,
-                    colors = ButtonDefaults.buttonColors(containerColor = DarkBgCardElevated),
-                    border = BorderStroke(1.dp, StabiloCyan.copy(alpha = 0.4f)),
-                    shape = RoundedCornerShape(10.dp),
-                    modifier = Modifier.fillMaxWidth().height(48.dp)
-                ) {
-                    Icon(Icons.Default.Apps, contentDescription = null, tint = StabiloCyan)
+                Button(onClick = onOpenApps, colors = ButtonDefaults.buttonColors(containerColor = DarkBgCardElevated), border = BorderStroke(1.dp, StabiloCyan.copy(alpha = 0.4f)), shape = RoundedCornerShape(10.dp), modifier = Modifier.fillMaxWidth().height(48.dp)) {
+                    Icon(Icons.Default.Apps, null, tint = StabiloCyan)
                     Spacer(modifier = Modifier.width(10.dp))
                     Text("Jelajahi Aplikasi (Ekstrak APK)", color = TextPrimary)
                 }
-
                 Spacer(modifier = Modifier.height(10.dp))
-
-                Button(
-                    onClick = onOpenDiskMap,
-                    colors = ButtonDefaults.buttonColors(containerColor = DarkBgCardElevated),
-                    border = BorderStroke(1.dp, StabiloYellow.copy(alpha = 0.4f)),
-                    shape = RoundedCornerShape(10.dp),
-                    modifier = Modifier.fillMaxWidth().height(48.dp)
-                ) {
-                    Icon(Icons.Default.PieChart, contentDescription = null, tint = StabiloYellow)
+                Button(onClick = onOpenDiskMap, colors = ButtonDefaults.buttonColors(containerColor = DarkBgCardElevated), border = BorderStroke(1.dp, StabiloYellow.copy(alpha = 0.4f)), shape = RoundedCornerShape(10.dp), modifier = Modifier.fillMaxWidth().height(48.dp)) {
+                    Icon(Icons.Default.PieChart, null, tint = StabiloYellow)
                     Spacer(modifier = Modifier.width(10.dp))
                     Text("Peta Penggunaan Memori (Disk Map)", color = TextPrimary)
                 }
-
                 Spacer(modifier = Modifier.height(10.dp))
-
-                Button(
-                    onClick = onOpenWifiShare,
-                    colors = ButtonDefaults.buttonColors(containerColor = DarkBgCardElevated),
-                    border = BorderStroke(1.dp, StabiloLime.copy(alpha = 0.4f)),
-                    shape = RoundedCornerShape(10.dp),
-                    modifier = Modifier.fillMaxWidth().height(48.dp)
-                ) {
-                    Icon(Icons.Default.Wifi, contentDescription = null, tint = StabiloLime)
+                Button(onClick = onOpenWifiShare, colors = ButtonDefaults.buttonColors(containerColor = DarkBgCardElevated), border = BorderStroke(1.dp, StabiloLime.copy(alpha = 0.4f)), shape = RoundedCornerShape(10.dp), modifier = Modifier.fillMaxWidth().height(48.dp)) {
+                    Icon(Icons.Default.Wifi, null, tint = StabiloLime)
                     Spacer(modifier = Modifier.width(10.dp))
                     Text("Server Berkas Wi-Fi (X-plore Style)", color = TextPrimary)
                 }
