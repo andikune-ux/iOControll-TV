@@ -6,6 +6,7 @@ import android.content.res.Configuration
 import android.os.Build
 import android.os.Environment
 import android.widget.Toast
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -36,7 +37,6 @@ import androidx.compose.material.icons.filled.FullscreenExit
 import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.PieChart
 import androidx.compose.material.icons.filled.Settings
-import androidx.compose.material.icons.filled.SettingsRemote
 import androidx.compose.material.icons.filled.SwapHoriz
 import androidx.compose.material.icons.filled.Tv
 import androidx.compose.material.icons.filled.Wifi
@@ -75,7 +75,6 @@ import dev.andikuneiocontroll.ui.filemanager.FilePaneView
 import dev.andikuneiocontroll.ui.filemanager.RenameDialog
 import dev.andikuneiocontroll.ui.filemanager.WifiShareDialog
 import dev.andikuneiocontroll.ui.permissions.PermissionHandlerView
-import dev.andikuneiocontroll.ui.remote.ConnectionPaneView
 import dev.andikuneiocontroll.ui.theme.DarkBgCard
 import dev.andikuneiocontroll.ui.theme.DarkBgCardElevated
 import dev.andikuneiocontroll.ui.theme.DarkBgPrimary
@@ -101,7 +100,6 @@ fun MainScreen(viewModel: MainViewModel) {
     val activity = context as? Activity
     val configuration = LocalConfiguration.current
 
-    // Cek izin penyimpanan awal
     var hasStoragePermission by remember {
         mutableStateOf(
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
@@ -123,15 +121,16 @@ fun MainScreen(viewModel: MainViewModel) {
         return
     }
 
-    // Logika responsif dengan LocalConfiguration.current.orientation sesuai spesifikasi
     val isLandscape = configuration.orientation == Configuration.ORIENTATION_LANDSCAPE
 
-    // State untuk Mode HP (Portrait): kontrol tampilan Pane Kiri vs Pane Kanan
+    // State untuk Mode HP: default = Pane Kiri
     var isLeftPaneVisible by remember { mutableStateOf(true) }
 
-    // Observables dari ViewModel
+    // Observables
     val pane1Path by viewModel.pane1Path.collectAsState()
     val pane1Items by viewModel.pane1Items.collectAsState()
+    val pane2Path by viewModel.pane2Path.collectAsState()
+    val pane2Items by viewModel.pane2Items.collectAsState()
     val activeViewer by viewModel.activeViewer.collectAsState()
     val serverConfig by viewModel.serverConfig.collectAsState()
     val serverUrl by viewModel.serverUrl.collectAsState()
@@ -140,30 +139,35 @@ fun MainScreen(viewModel: MainViewModel) {
     val storageStats by viewModel.storageCategories.collectAsState()
     val totalStorageBytes by viewModel.totalStorageBytes.collectAsState()
 
-    // Dialog state
     var contextMenuItem by remember { mutableStateOf<FileItem?>(null) }
     var renameTargetItem by remember { mutableStateOf<FileItem?>(null) }
     var showBatchRenameDialog by remember { mutableStateOf(false) }
     var showLauncherOverlay by remember { mutableStateOf(false) }
+    var showConnectionDialog by remember { mutableStateOf(false) }
 
     val pane1SelectedCount = remember(pane1Items) { pane1Items.count { it.isSelected } }
-    val anySelected = pane1SelectedCount > 0
+    val pane2SelectedCount = remember(pane2Items) { pane2Items.count { it.isSelected } }
+    val anySelected = pane1SelectedCount > 0 || pane2SelectedCount > 0
+    val isServerRunning = serverConfig.isRunning
 
     Scaffold(
         modifier = Modifier.fillMaxSize(),
         containerColor = DarkBgPrimary,
         bottomBar = {
             if (anySelected) {
+                val isPane1 = pane1SelectedCount > 0
                 StabiloMultiSelectionBar(
-                    selectedCount = pane1SelectedCount,
-                    onCopy = { viewModel.copyToOppositePane(fromPane1 = true, isMove = false) },
-                    onMove = { viewModel.copyToOppositePane(fromPane1 = true, isMove = true) },
-                    onWifiShare = { viewModel.shareSelectedOverWifi(fromPane1 = true) },
-                    onCompress = { viewModel.compressSelected(fromPane1 = true) },
+                    selectedCount = if (isPane1) pane1SelectedCount else pane2SelectedCount,
+                    onCopy = { viewModel.copyToOppositePane(fromPane1 = isPane1, isMove = false) },
+                    onMove = { viewModel.copyToOppositePane(fromPane1 = isPane1, isMove = true) },
+                    onWifiShare = { viewModel.shareSelectedOverWifi(fromPane1 = isPane1) },
+                    onCompress = { viewModel.compressSelected(fromPane1 = isPane1) },
                     onVault = { viewModel.setViewer(ActiveViewer.Vault) },
-                    onDelete = { viewModel.deleteSelected(fromPane1 = true) },
+                    onDelete = { viewModel.deleteSelected(fromPane1 = isPane1) },
                     onBatchRename = { showBatchRenameDialog = true },
-                    onClear = { viewModel.clearSelectPane1() }
+                    onClear = {
+                        if (isPane1) viewModel.clearSelectPane1() else viewModel.clearSelectPane2()
+                    }
                 )
             }
         }
@@ -174,13 +178,10 @@ fun MainScreen(viewModel: MainViewModel) {
                 .padding(innerPadding)
         ) {
             if (isLandscape) {
-                // =========================================================================
-                // --- A. MODE TV (LANDSCAPE) - TAMPILAN 2 PANE ---
-                // Mengikuti struktur kode & hierarki Jetpack Compose sesuai spesifikasi
-                // =========================================================================
+                // ============ MODE TV (LANDSCAPE) - 2 PANE FILE MANAGER ============
                 Box(modifier = Modifier.fillMaxSize()) {
                     Row(modifier = Modifier.fillMaxSize()) {
-                        // 1. Pane Kiri (Penyimpanan Internal, Folder, File, Foto, Video)
+                        // Pane Kiri
                         Box(modifier = Modifier.weight(1f)) {
                             FilePaneView(
                                 paneTitle = "PANE KIRI • PENYIMPANAN INTERNAL",
@@ -205,7 +206,7 @@ fun MainScreen(viewModel: MainViewModel) {
                             )
                         }
 
-                        // 2. Toolbar Tengah (Garis Pembatas Vertikal Fisik di Tengah)
+                        // Toolbar Tengah (Garis Pembatas Vertikal)
                         Column(
                             modifier = Modifier
                                 .width(60.dp)
@@ -217,10 +218,7 @@ fun MainScreen(viewModel: MainViewModel) {
                         ) {
                             // Icon Gerigi (Atas)
                             IconButton(
-                                onClick = {
-                                    viewModel.setShowWifiShareDialog(true)
-                                    Toast.makeText(context, "Pengaturan & Wi-Fi Sharing", Toast.LENGTH_SHORT).show()
-                                },
+                                onClick = { viewModel.setShowWifiShareDialog(true) },
                                 modifier = Modifier.padding(top = 12.dp)
                             ) {
                                 Icon(
@@ -231,13 +229,11 @@ fun MainScreen(viewModel: MainViewModel) {
                                 )
                             }
 
-                            // Area Tengah: Panah D-Pad & Tombol Fullscreen
+                            // Tengah: D-Pad, Fullscreen, Status Koneksi
                             Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                                // Panah D-Pad
                                 IconButton(
                                     onClick = {
                                         viewModel.remoteClient.sendCommand("DPAD_RIGHT")
-                                        Toast.makeText(context, "Navigasi D-Pad", Toast.LENGTH_SHORT).show()
                                     }
                                 ) {
                                     Icon(
@@ -248,13 +244,11 @@ fun MainScreen(viewModel: MainViewModel) {
                                     )
                                 }
 
-                                Spacer(modifier = Modifier.height(16.dp))
+                                Spacer(modifier = Modifier.height(12.dp))
 
-                                // Tombol Fullscreen (Rotasi ke Portrait jika diperlukan)
                                 IconButton(
                                     onClick = {
                                         activity?.requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_PORTRAIT
-                                        Toast.makeText(context, "Kembali ke Mode Portrait (HP)", Toast.LENGTH_SHORT).show()
                                     }
                                 ) {
                                     Icon(
@@ -264,13 +258,19 @@ fun MainScreen(viewModel: MainViewModel) {
                                         modifier = Modifier.size(26.dp)
                                     )
                                 }
+
+                                Spacer(modifier = Modifier.height(12.dp))
+
+                                // Indikator Status Koneksi (Dot)
+                                ConnectionStatusDot(
+                                    isConnected = isServerRunning,
+                                    onClick = { showConnectionDialog = true }
+                                )
                             }
 
                             // Icon Remote (Bawah)
                             IconButton(
-                                onClick = {
-                                    Toast.makeText(context, "Remote TV Aktif di Pane Kanan", Toast.LENGTH_SHORT).show()
-                                },
+                                onClick = { showConnectionDialog = true },
                                 modifier = Modifier.padding(bottom = 14.dp)
                             ) {
                                 Icon(
@@ -282,17 +282,33 @@ fun MainScreen(viewModel: MainViewModel) {
                             }
                         }
 
-                        // 3. Pane Kanan (Tampilkan status koneksi Tahap I / Tahap II)
+                        // Pane Kanan (File Manager - pane2)
                         Box(modifier = Modifier.weight(1f)) {
-                            ConnectionPaneView(
-                                remoteClient = viewModel.remoteClient,
-                                remoteServer = viewModel.remoteServer,
+                            FilePaneView(
+                                paneTitle = "PANE KANAN • PENYIMPANAN INTERNAL",
+                                currentPath = pane2Path,
+                                items = pane2Items,
+                                selectedCount = pane2SelectedCount,
+                                onNavigate = { viewModel.loadPane2(it) },
+                                onNavigateUp = { viewModel.navigateUpPane2() },
+                                onItemClick = { viewModel.openFile(it) },
+                                onItemLongClick = { contextMenuItem = it },
+                                onToggleSelect = { viewModel.toggleSelectPane2(it) },
+                                onSelectAll = { viewModel.selectAllPane2() },
+                                onClearSelection = { viewModel.clearSelectPane2() },
+                                onSwitchStorage = { label ->
+                                    when (label) {
+                                        "Penyimpanan Internal" -> viewModel.loadPane2(FileManagerHelper.getDefaultStoragePath())
+                                        "Aplikasi (APK)" -> viewModel.loadPane2("APPLICATIONS")
+                                        else -> viewModel.setViewer(ActiveViewer.Vault)
+                                    }
+                                },
                                 modifier = Modifier.fillMaxSize()
                             )
                         }
                     }
 
-                    // 4. Overlay Icon Launcher di sudut kanan atas
+                    // Overlay Icon Launcher di sudut kanan atas
                     Box(
                         modifier = Modifier
                             .align(Alignment.TopEnd)
@@ -301,7 +317,7 @@ fun MainScreen(viewModel: MainViewModel) {
                         Surface(
                             shape = CircleShape,
                             color = DarkBgCardElevated,
-                            border = androidx.compose.foundation.BorderStroke(1.5.dp, StabiloLime),
+                            border = BorderStroke(1.5.dp, StabiloLime),
                             shadowElevation = 8.dp,
                             modifier = Modifier
                                 .size(42.dp)
@@ -320,15 +336,12 @@ fun MainScreen(viewModel: MainViewModel) {
                     }
                 }
             } else {
-                // =========================================================================
-                // --- B. MODE HP (PORTRAIT) - TAMPILAN 1 PANE ---
-                // Sesuai skema: 1 Pane ditampilkan bergantian, Toolbar di sisi kanan
-                // =========================================================================
+                // ============ MODE HP (PORTRAIT) - 1 PANE FILE MANAGER ============
                 Row(modifier = Modifier.fillMaxSize()) {
-                    // 1. Area Konten Pane (Hanya 1 yang ditampilkan berdasarkan state isLeftPaneVisible)
+                    // Area Konten Pane
                     Box(modifier = Modifier.weight(1f)) {
                         if (isLeftPaneVisible) {
-                            // SKENARIO 1: TAMPILAN PANE KIRI (Penyimpanan Internal, Folder, File)
+                            // Pane Kiri
                             FilePaneView(
                                 paneTitle = "PANE KIRI (MODE HP) • FILE MANAGER",
                                 currentPath = pane1Path,
@@ -351,16 +364,32 @@ fun MainScreen(viewModel: MainViewModel) {
                                 modifier = Modifier.fillMaxSize()
                             )
                         } else {
-                            // SKENARIO 2: TAMPILAN PANE KANAN (Status Koneksi Tahap I / Tahap II)
-                            ConnectionPaneView(
-                                remoteClient = viewModel.remoteClient,
-                                remoteServer = viewModel.remoteServer,
+                            // Pane Kanan
+                            FilePaneView(
+                                paneTitle = "PANE KANAN (MODE HP) • FILE MANAGER",
+                                currentPath = pane2Path,
+                                items = pane2Items,
+                                selectedCount = pane2SelectedCount,
+                                onNavigate = { viewModel.loadPane2(it) },
+                                onNavigateUp = { viewModel.navigateUpPane2() },
+                                onItemClick = { viewModel.openFile(it) },
+                                onItemLongClick = { contextMenuItem = it },
+                                onToggleSelect = { viewModel.toggleSelectPane2(it) },
+                                onSelectAll = { viewModel.selectAllPane2() },
+                                onClearSelection = { viewModel.clearSelectPane2() },
+                                onSwitchStorage = { label ->
+                                    when (label) {
+                                        "Penyimpanan Internal" -> viewModel.loadPane2(FileManagerHelper.getDefaultStoragePath())
+                                        "Aplikasi (APK)" -> viewModel.loadPane2("APPLICATIONS")
+                                        else -> viewModel.setViewer(ActiveViewer.Vault)
+                                    }
+                                },
                                 modifier = Modifier.fillMaxSize()
                             )
                         }
                     }
 
-                    // 2. Toolbar Kanan (Dropdown / Vertical Bar di Sisi Kanan)
+                    // Toolbar Kanan (Dropdown)
                     Column(
                         modifier = Modifier
                             .width(50.dp)
@@ -370,12 +399,9 @@ fun MainScreen(viewModel: MainViewModel) {
                         horizontalAlignment = Alignment.CenterHorizontally,
                         verticalArrangement = Arrangement.Center
                     ) {
-                        // [Icon Gerigi]
+                        // Icon Gerigi
                         IconButton(
-                            onClick = {
-                                viewModel.setShowWifiShareDialog(true)
-                                Toast.makeText(context, "Buka Pengaturan Wi-Fi", Toast.LENGTH_SHORT).show()
-                            }
+                            onClick = { viewModel.setShowWifiShareDialog(true) }
                         ) {
                             Icon(
                                 Icons.Default.Settings,
@@ -387,13 +413,9 @@ fun MainScreen(viewModel: MainViewModel) {
 
                         Spacer(modifier = Modifier.height(18.dp))
 
-                        // Tombol Switch Pane: Mengubah state isLeftPaneVisible (Panah D-Pad / Switch)
+                        // Switch Pane
                         IconButton(
-                            onClick = {
-                                isLeftPaneVisible = !isLeftPaneVisible
-                                val label = if (isLeftPaneVisible) "Beralih ke Pane Kiri (Penyimpanan)" else "Beralih ke Pane Kanan (Status Koneksi)"
-                                Toast.makeText(context, label, Toast.LENGTH_SHORT).show()
-                            }
+                            onClick = { isLeftPaneVisible = !isLeftPaneVisible }
                         ) {
                             Icon(
                                 Icons.Default.SwapHoriz,
@@ -405,11 +427,10 @@ fun MainScreen(viewModel: MainViewModel) {
 
                         Spacer(modifier = Modifier.height(18.dp))
 
-                        // [Tombol Fullscreen] (Paksa Rotasi ke TV / Landscape)
+                        // Fullscreen (Paksa Landscape)
                         IconButton(
                             onClick = {
                                 activity?.requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE
-                                Toast.makeText(context, "Memaksa Rotasi ke Mode TV (Landscape)", Toast.LENGTH_SHORT).show()
                             }
                         ) {
                             Icon(
@@ -422,12 +443,17 @@ fun MainScreen(viewModel: MainViewModel) {
 
                         Spacer(modifier = Modifier.height(18.dp))
 
-                        // [Icon Remote]
+                        // Indikator Status Koneksi
+                        ConnectionStatusDot(
+                            isConnected = isServerRunning,
+                            onClick = { showConnectionDialog = true }
+                        )
+
+                        Spacer(modifier = Modifier.height(18.dp))
+
+                        // Remote Icon
                         IconButton(
-                            onClick = {
-                                isLeftPaneVisible = false // Buka Pane Kanan (Remote & Koneksi)
-                                Toast.makeText(context, "Membuka Panel Remote TV", Toast.LENGTH_SHORT).show()
-                            }
+                            onClick = { showConnectionDialog = true }
                         ) {
                             Icon(
                                 Icons.Default.Tv,
@@ -443,8 +469,26 @@ fun MainScreen(viewModel: MainViewModel) {
     }
 
     // ==========================================
-    // OVERLAYS & DIALOGS SISTEM
+    // OVERLAYS & DIALOGS
     // ==========================================
+
+    // Dialog Status Koneksi (Simple)
+    if (showConnectionDialog) {
+        ConnectionInfoDialog(
+            isConnected = isServerRunning,
+            serverUrl = serverUrl,
+            peerCount = discoveredPeers.size,
+            onOpenRemote = {
+                showConnectionDialog = false
+                Toast.makeText(context, "Fitur Remote TV akan tersedia di update berikutnya", Toast.LENGTH_SHORT).show()
+            },
+            onOpenWifiSettings = {
+                showConnectionDialog = false
+                viewModel.setShowWifiShareDialog(true)
+            },
+            onDismiss = { showConnectionDialog = false }
+        )
+    }
 
     // Launcher Overlay Dialog
     if (showLauncherOverlay) {
@@ -476,7 +520,7 @@ fun MainScreen(viewModel: MainViewModel) {
                 viewModel.loadPane2("http://${peer.ip}:${peer.port}")
                 viewModel.setShowWifiShareDialog(false)
             },
-            onSavePeer = { peer, label, pwd, path ->
+            onSavePeer = { _, label, _, _ ->
                 Toast.makeText(context, "Perangkat $label tersimpan", Toast.LENGTH_SHORT).show()
             },
             onDismiss = { viewModel.setShowWifiShareDialog(false) }
@@ -518,63 +562,143 @@ fun MainScreen(viewModel: MainViewModel) {
         )
     }
 
-    // Active Viewers Dialogs
+    // Active Viewers
     when (val viewer = activeViewer) {
-        is ActiveViewer.Video -> {
-            VideoPlayerDialog(
-                filePath = viewer.path,
-                fileName = viewer.name,
-                onDismiss = { viewModel.closeViewer() }
-            )
-        }
-        is ActiveViewer.Image -> {
-            ImageViewerDialog(
-                filePath = viewer.path,
-                fileName = viewer.name,
-                allImages = viewer.imageList,
-                onDismiss = { viewModel.closeViewer() }
-            )
-        }
-        is ActiveViewer.Audio -> {
-            AudioPlayerDialog(
-                filePath = viewer.path,
-                fileName = viewer.name,
-                onDismiss = { viewModel.closeViewer() }
-            )
-        }
-        is ActiveViewer.Text -> {
-            TextViewerDialog(
-                fileName = viewer.name,
-                content = viewer.text,
-                onDismiss = { viewModel.closeViewer() }
-            )
-        }
-        is ActiveViewer.Hex -> {
-            HexViewerDialog(
-                fileName = viewer.name,
-                hexContent = viewer.hexPreview,
-                onDismiss = { viewModel.closeViewer() }
-            )
-        }
-        is ActiveViewer.DiskMap -> {
-            DiskMapDialog(
-                categoryStats = storageStats,
-                totalSizeBytes = totalStorageBytes,
-                onDismiss = { viewModel.closeViewer() }
-            )
-        }
-        is ActiveViewer.Vault -> {
-            VaultDialog(
-                onEncrypt = { pwd -> viewModel.encryptSelectedToVault(pwd) },
-                onDecrypt = { pwd ->
-                    contextMenuItem?.let { viewModel.decryptVaultFile(it.path, pwd) }
-                },
-                isDecryptMode = contextMenuItem?.path?.endsWith(".vault") == true,
-                onDismiss = { viewModel.closeViewer() }
-            )
-        }
+        is ActiveViewer.Video -> VideoPlayerDialog(viewer.path, viewer.name, onDismiss = { viewModel.closeViewer() })
+        is ActiveViewer.Image -> ImageViewerDialog(viewer.path, viewer.name, viewer.imageList, onDismiss = { viewModel.closeViewer() })
+        is ActiveViewer.Audio -> AudioPlayerDialog(viewer.path, viewer.name, onDismiss = { viewModel.closeViewer() })
+        is ActiveViewer.Text -> TextViewerDialog(viewer.name, viewer.text, onDismiss = { viewModel.closeViewer() })
+        is ActiveViewer.Hex -> HexViewerDialog(viewer.name, viewer.hexPreview, onDismiss = { viewModel.closeViewer() })
+        is ActiveViewer.DiskMap -> DiskMapDialog(storageStats, totalStorageBytes, onDismiss = { viewModel.closeViewer() })
+        is ActiveViewer.Vault -> VaultDialog(
+            onEncrypt = { pwd -> viewModel.encryptSelectedToVault(pwd) },
+            onDecrypt = { pwd -> contextMenuItem?.let { viewModel.decryptVaultFile(it.path, pwd) } },
+            isDecryptMode = contextMenuItem?.path?.endsWith(".vault") == true,
+            onDismiss = { viewModel.closeViewer() }
+        )
         ActiveViewer.None -> {}
         else -> {}
+    }
+}
+
+// ==========================================
+// COMPONENT: Status Koneksi Dot (Kecil)
+// ==========================================
+@Composable
+fun ConnectionStatusDot(
+    isConnected: Boolean,
+    onClick: () -> Unit
+) {
+    val dotColor = if (isConnected) Color(0xFF22C55E) else TextMuted
+    Box(
+        modifier = Modifier
+            .size(36.dp)
+            .clip(CircleShape)
+            .background(DarkBgCardElevated)
+            .border(1.dp, dotColor.copy(alpha = 0.5f), CircleShape)
+            .clickable(onClick = onClick),
+        contentAlignment = Alignment.Center
+    ) {
+        Box(
+            modifier = Modifier
+                .size(10.dp)
+                .clip(CircleShape)
+                .background(dotColor)
+        )
+    }
+}
+
+// ==========================================
+// DIALOG: Info Status Koneksi
+// ==========================================
+@Composable
+fun ConnectionInfoDialog(
+    isConnected: Boolean,
+    serverUrl: String,
+    peerCount: Int,
+    onOpenRemote: () -> Unit,
+    onOpenWifiSettings: () -> Unit,
+    onDismiss: () -> Unit
+) {
+    Dialog(onDismissRequest = onDismiss) {
+        Card(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(16.dp),
+            colors = CardDefaults.cardColors(containerColor = DarkBgCard),
+            border = BorderStroke(1.dp, StabiloCyan.copy(alpha = 0.5f)),
+            shape = RoundedCornerShape(16.dp)
+        ) {
+            Column(modifier = Modifier.padding(20.dp)) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        "Status Koneksi",
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 16.sp,
+                        color = StabiloCyan
+                    )
+                    IconButton(onClick = onDismiss) {
+                        Icon(Icons.Default.Close, contentDescription = "Tutup", tint = TextSecondary)
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(12.dp))
+
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Box(
+                        modifier = Modifier
+                            .size(12.dp)
+                            .clip(CircleShape)
+                            .background(if (isConnected) Color(0xFF22C55E) else TextMuted)
+                    )
+                    Spacer(modifier = Modifier.width(10.dp))
+                    Text(
+                        if (isConnected) "Server Aktif" else "Belum Terhubung",
+                        color = TextPrimary,
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 14.sp
+                    )
+                }
+
+                Spacer(modifier = Modifier.height(8.dp))
+
+                if (isConnected && serverUrl.isNotEmpty()) {
+                    Text("URL: $serverUrl", color = TextSecondary, fontSize = 12.sp)
+                }
+                Text("Perangkat ditemukan: $peerCount", color = TextSecondary, fontSize = 12.sp)
+
+                Spacer(modifier = Modifier.height(16.dp))
+
+                Button(
+                    onClick = onOpenWifiSettings,
+                    colors = ButtonDefaults.buttonColors(containerColor = StabiloLime),
+                    shape = RoundedCornerShape(10.dp),
+                    modifier = Modifier.fillMaxWidth().height(44.dp)
+                ) {
+                    Icon(Icons.Default.Wifi, contentDescription = null, tint = Color.Black)
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text("Buka Server WiFi", color = Color.Black, fontWeight = FontWeight.Bold)
+                }
+
+                Spacer(modifier = Modifier.height(8.dp))
+
+                Button(
+                    onClick = onOpenRemote,
+                    colors = ButtonDefaults.buttonColors(containerColor = DarkBgCardElevated),
+                    border = BorderStroke(1.dp, StabiloPink.copy(alpha = 0.5f)),
+                    shape = RoundedCornerShape(10.dp),
+                    modifier = Modifier.fillMaxWidth().height(44.dp)
+                ) {
+                    Icon(Icons.Default.Tv, contentDescription = null, tint = StabiloPink)
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text("Remote TV", color = TextPrimary)
+                }
+            }
+        }
     }
 }
 
@@ -595,7 +719,7 @@ fun StabiloMultiSelectionBar(
             .fillMaxWidth()
             .padding(8.dp),
         colors = CardDefaults.cardColors(containerColor = DarkBgCardElevated),
-        border = androidx.compose.foundation.BorderStroke(1.dp, StabiloLime.copy(alpha = 0.5f)),
+        border = BorderStroke(1.dp, StabiloLime.copy(alpha = 0.5f)),
         shape = RoundedCornerShape(14.dp)
     ) {
         Row(
@@ -632,7 +756,7 @@ fun StabiloMultiSelectionBar(
             ) {
                 Icon(Icons.Default.Wifi, contentDescription = null, tint = Color.Black, modifier = Modifier.size(16.dp))
                 Spacer(modifier = Modifier.width(4.dp))
-                Text("WiFi Share", color = Color.Black, fontWeight = FontWeight.Bold, fontSize = 12.sp)
+                Text("WiFi", color = Color.Black, fontWeight = FontWeight.Bold, fontSize = 12.sp)
             }
 
             IconButton(onClick = onCompress) {
@@ -667,7 +791,7 @@ fun StabiloLauncherDialog(
                 .fillMaxWidth()
                 .padding(16.dp),
             colors = CardDefaults.cardColors(containerColor = DarkBgCard),
-            border = androidx.compose.foundation.BorderStroke(1.dp, StabiloLime.copy(alpha = 0.5f)),
+            border = BorderStroke(1.dp, StabiloLime.copy(alpha = 0.5f)),
             shape = RoundedCornerShape(16.dp)
         ) {
             Column(modifier = Modifier.padding(20.dp)) {
@@ -692,7 +816,7 @@ fun StabiloLauncherDialog(
                 Button(
                     onClick = onOpenApps,
                     colors = ButtonDefaults.buttonColors(containerColor = DarkBgCardElevated),
-                    border = androidx.compose.foundation.BorderStroke(1.dp, StabiloCyan.copy(alpha = 0.4f)),
+                    border = BorderStroke(1.dp, StabiloCyan.copy(alpha = 0.4f)),
                     shape = RoundedCornerShape(10.dp),
                     modifier = Modifier.fillMaxWidth().height(48.dp)
                 ) {
@@ -706,7 +830,7 @@ fun StabiloLauncherDialog(
                 Button(
                     onClick = onOpenDiskMap,
                     colors = ButtonDefaults.buttonColors(containerColor = DarkBgCardElevated),
-                    border = androidx.compose.foundation.BorderStroke(1.dp, StabiloYellow.copy(alpha = 0.4f)),
+                    border = BorderStroke(1.dp, StabiloYellow.copy(alpha = 0.4f)),
                     shape = RoundedCornerShape(10.dp),
                     modifier = Modifier.fillMaxWidth().height(48.dp)
                 ) {
@@ -720,7 +844,7 @@ fun StabiloLauncherDialog(
                 Button(
                     onClick = onOpenWifiShare,
                     colors = ButtonDefaults.buttonColors(containerColor = DarkBgCardElevated),
-                    border = androidx.compose.foundation.BorderStroke(1.dp, StabiloLime.copy(alpha = 0.4f)),
+                    border = BorderStroke(1.dp, StabiloLime.copy(alpha = 0.4f)),
                     shape = RoundedCornerShape(10.dp),
                     modifier = Modifier.fillMaxWidth().height(48.dp)
                 ) {
