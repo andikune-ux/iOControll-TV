@@ -46,10 +46,12 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -62,12 +64,14 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import dev.andikuneiocontroll.MainViewModel
+import dev.andikuneiocontroll.data.local.TvEntity
 import dev.andikuneiocontroll.filemanager.FileManagerHelper
 import dev.andikuneiocontroll.model.ActiveViewer
 import dev.andikuneiocontroll.model.FileItem
+import dev.andikuneiocontroll.remote.discovery.DiscoveredTv
+import dev.andikuneiocontroll.remote.protocol.TvCommand
 import dev.andikuneiocontroll.ui.components.MobileModeView
 import dev.andikuneiocontroll.ui.components.RainbowRemoteIcon
-import dev.andikuneiocontroll.ui.components.RemoteTvDialog
 import dev.andikuneiocontroll.ui.components.SettingsDialog
 import dev.andikuneiocontroll.ui.components.StabiloTooltipButton
 import dev.andikuneiocontroll.ui.filemanager.BatchRenameDialog
@@ -76,6 +80,14 @@ import dev.andikuneiocontroll.ui.filemanager.FilePaneView
 import dev.andikuneiocontroll.ui.filemanager.RenameDialog
 import dev.andikuneiocontroll.ui.filemanager.WifiShareDialog
 import dev.andikuneiocontroll.ui.permissions.PermissionHandlerView
+import dev.andikuneiocontroll.ui.remote.RemoteTvDialog
+import dev.andikuneiocontroll.ui.remote.dialogs.InfoTvDialog
+import dev.andikuneiocontroll.ui.remote.dialogs.InputSourceDialog
+import dev.andikuneiocontroll.ui.remote.dialogs.ManualIpDialog
+import dev.andikuneiocontroll.ui.remote.dialogs.PairingPinDialog
+import dev.andikuneiocontroll.ui.remote.dialogs.ShortcutDialog
+import dev.andikuneiocontroll.ui.remote.dialogs.TvPickerDialog
+import dev.andikuneiocontroll.ui.remote.settings.RemoteSettingsScreen
 import dev.andikuneiocontroll.ui.theme.DarkBgCard
 import dev.andikuneiocontroll.ui.theme.DarkBgCardElevated
 import dev.andikuneiocontroll.ui.theme.DarkBgPrimary
@@ -94,12 +106,18 @@ import dev.andikuneiocontroll.viewers.ImageViewerDialog
 import dev.andikuneiocontroll.viewers.TextViewerDialog
 import dev.andikuneiocontroll.viewers.VaultDialog
 import dev.andikuneiocontroll.viewers.VideoPlayerDialog
+import kotlinx.coroutines.launch
+
 @Composable
 fun MainScreen(viewModel: MainViewModel) {
     val context = LocalContext.current
     val configuration = LocalConfiguration.current
     val activity = context as? android.app.Activity
+    val scope = rememberCoroutineScope()
 
+    // ==========================================================
+    // PERMISSION
+    // ==========================================================
     var hasStoragePermission by remember {
         mutableStateOf(
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
@@ -121,6 +139,9 @@ fun MainScreen(viewModel: MainViewModel) {
         return
     }
 
+    // ==========================================================
+    // STATE
+    // ==========================================================
     val isLandscape = configuration.orientation == Configuration.ORIENTATION_LANDSCAPE
     var isLeftPaneVisible by remember { mutableStateOf(true) }
 
@@ -136,6 +157,11 @@ fun MainScreen(viewModel: MainViewModel) {
     val storageStats by viewModel.storageCategories.collectAsState()
     val totalStorageBytes by viewModel.totalStorageBytes.collectAsState()
 
+    // Remote TV state
+    val discoveredTvs by viewModel.discoveredTvs.collectAsState()
+    val savedTvs by viewModel.savedTvs.collectAsState()
+    val isScanningTv by viewModel.isScanningTv.collectAsState()
+
     var contextMenuItem by remember { mutableStateOf<FileItem?>(null) }
     var renameTargetItem by remember { mutableStateOf<FileItem?>(null) }
     var showBatchRenameDialog by remember { mutableStateOf(false) }
@@ -143,10 +169,67 @@ fun MainScreen(viewModel: MainViewModel) {
     var showSettingsDialog by remember { mutableStateOf(false) }
     var showRemoteDialog by remember { mutableStateOf(false) }
 
+    // Dialog Remote TV
+    var showTvPickerDialog by remember { mutableStateOf(false) }
+    var showManualIpDialog by remember { mutableStateOf(false) }
+    var showPairingDialog by remember { mutableStateOf(false) }
+    var showInfoTvDialog by remember { mutableStateOf(false) }
+    var showInputSourceDialog by remember { mutableStateOf(false) }
+    var showShortcutDialog by remember { mutableStateOf(false) }
+    var showRemoteSettings by remember { mutableStateOf(false) }
+
+    // Pairing state
+    var pairingTvName by remember { mutableStateOf("") }
+    var pairingTv: DiscoveredTv? by remember { mutableStateOf(null) }
+    var pairingError by remember { mutableStateOf("") }
+    var isPairingSubmitting by remember { mutableStateOf(false) }
+
+    // Info TV state
+    var infoTvName by remember { mutableStateOf("") }
+
     val pane1SelectedCount = remember(pane1Items) { pane1Items.count { it.isSelected } }
     val pane2SelectedCount = remember(pane2Items) { pane2Items.count { it.isSelected } }
     val anySelected = pane1SelectedCount > 0 || pane2SelectedCount > 0
     val isServerRunning = serverConfig.isRunning
+
+    // ==========================================================
+    // AUTO-SCAN saat dialog TV picker dibuka
+    // ==========================================================
+    LaunchedEffect(showTvPickerDialog) {
+        if (showTvPickerDialog) {
+            viewModel.scanTvs()
+        }
+    }
+
+    // Helper: buka TV Picker
+    val openTvPicker: () -> Unit = {
+        showRemoteDialog = false
+        showTvPickerDialog = true
+    }
+
+    // Helper: connect ke TV
+    val connectToTv: (DiscoveredTv, String) -> Unit = { tv, pin ->
+        pairingTvName = tv.displayName
+        pairingTv = tv
+        isPairingSubmitting = true
+        pairingError = ""
+        viewModel.connectToTv(tv, pin) { success, message ->
+            isPairingSubmitting = false
+            if (success) {
+                showPairingDialog = false
+                showTvPickerDialog = false
+                showRemoteDialog = true
+                Toast.makeText(context, message, Toast.LENGTH_SHORT).show()
+            } else {
+                // Kalau butuh pairing, munculkan dialog PIN
+                if (message.contains("PIN", ignoreCase = true)) {
+                    showPairingDialog = true
+                } else {
+                    pairingError = message
+                }
+            }
+        }
+    }
     Scaffold(
     modifier = Modifier.fillMaxSize(),
     containerColor = DarkBgPrimary,
@@ -178,6 +261,7 @@ fun MainScreen(viewModel: MainViewModel) {
             // ============ MODE TV (LANDSCAPE) - 2 PANE ============
             Box(modifier = Modifier.fillMaxSize()) {
                 Row(modifier = Modifier.fillMaxSize()) {
+                    // Pane Kiri
                     Box(modifier = Modifier.weight(1f)) {
                         FilePaneView(
                             paneTitle = "PANE KIRI • PENYIMPANAN INTERNAL",
@@ -202,6 +286,7 @@ fun MainScreen(viewModel: MainViewModel) {
                         )
                     }
 
+                    // Toolbar Tengah (Garis Pembatas)
                     Column(
                         modifier = Modifier
                             .width(60.dp)
@@ -226,7 +311,7 @@ fun MainScreen(viewModel: MainViewModel) {
                                 icon = Icons.AutoMirrored.Filled.ArrowForward,
                                 tooltip = "D-Pad Kanan",
                                 tint = StabiloLime,
-                                onClick = { viewModel.remoteClient.sendCommand("DPAD_RIGHT") },
+                                onClick = { viewModel.sendTvCommand(TvCommand.DPAD_RIGHT) },
                                 buttonSize = 42.dp,
                                 iconSize = 26.dp
                             )
@@ -239,7 +324,7 @@ fun MainScreen(viewModel: MainViewModel) {
                                 tint = StabiloYellow,
                                 onClick = {
                                     activity?.requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_PORTRAIT
-                                    Toast.makeText(context, "Beralih ke Mode HP (Portrait)", Toast.LENGTH_SHORT).show()
+                                    Toast.makeText(context, "Beralih ke Mode HP", Toast.LENGTH_SHORT).show()
                                 },
                                 buttonSize = 42.dp,
                                 iconSize = 26.dp
@@ -258,7 +343,15 @@ fun MainScreen(viewModel: MainViewModel) {
                         }
 
                         RainbowRemoteIcon(
-                            onClick = { showRemoteDialog = true },
+                            onClick = {
+                                // Kalau sudah connect, langsung buka remote
+                                // Kalau belum, buka TV Picker
+                                if (viewModel.remoteController.isConnected()) {
+                                    showRemoteDialog = true
+                                } else {
+                                    openTvPicker()
+                                }
+                            },
                             modifier = Modifier.padding(bottom = 14.dp),
                             buttonSize = 42.dp,
                             iconSize = 26.dp,
@@ -266,6 +359,7 @@ fun MainScreen(viewModel: MainViewModel) {
                         )
                     }
 
+                    // Pane Kanan
                     Box(modifier = Modifier.weight(1f)) {
                         FilePaneView(
                             paneTitle = "PANE KANAN • PENYIMPANAN INTERNAL",
@@ -291,6 +385,7 @@ fun MainScreen(viewModel: MainViewModel) {
                     }
                 }
 
+                // Overlay Launcher
                 Box(modifier = Modifier.align(Alignment.TopEnd).padding(16.dp)) {
                     Surface(
                         shape = CircleShape,
@@ -314,12 +409,21 @@ fun MainScreen(viewModel: MainViewModel) {
                 }
             }
         } else {
+            // ============ MODE HP (PORTRAIT) ============
             MobileModeView(
                 isLeftPaneVisible = isLeftPaneVisible,
                 onTogglePane = { isLeftPaneVisible = !isLeftPaneVisible },
                 onOpenSettings = { showSettingsDialog = true },
                 onOpenWifiServer = { viewModel.setShowWifiShareDialog(true) },
-                onOpenRemote = { showRemoteDialog = true },
+                onOpenRemote = {
+                    // Kalau sudah connect, langsung buka remote
+                    // Kalau belum, buka TV Picker
+                    if (viewModel.remoteController.isConnected()) {
+                        showRemoteDialog = true
+                    } else {
+                        openTvPicker()
+                    }
+                },
                 isConnected = isServerRunning,
                 paneContent = {
                     if (isLeftPaneVisible) {
@@ -372,8 +476,11 @@ fun MainScreen(viewModel: MainViewModel) {
         }
     }
     }
-        // ============ OVERLAYS & DIALOGS ============
+        // ==========================================================
+    // SEMUA DIALOG & OVERLAY
+    // ==========================================================
 
+    // === SETTINGS DIALOG (Backup Aman) ===
     if (showSettingsDialog) {
         SettingsDialog(
             context = context,
@@ -381,14 +488,209 @@ fun MainScreen(viewModel: MainViewModel) {
         )
     }
 
+    // === REMOTE TV DIALOG (BARU) ===
     if (showRemoteDialog) {
         RemoteTvDialog(
-            remoteClient = viewModel.remoteClient,
-            remoteServer = viewModel.remoteServer,
-            onDismiss = { showRemoteDialog = false }
+            remoteController = viewModel.remoteController,
+            onDismiss = { showRemoteDialog = false },
+            onOpenSettings = { showRemoteSettings = true },
+            onOpenTvList = {
+                showRemoteDialog = false
+                showTvPickerDialog = true
+            },
+            onOpenInputSource = { showInputSourceDialog = true },
+            onOpenKeyboard = {
+                Toast.makeText(context, "Keyboard akan segera hadir", Toast.LENGTH_SHORT).show()
+            },
+            onOpenCast = {
+                Toast.makeText(context, "Screen Cast akan segera hadir", Toast.LENGTH_SHORT).show()
+            },
+            onOpenShortcut = { showShortcutDialog = true }
         )
     }
 
+    // === REMOTE SETTINGS ===
+    if (showRemoteSettings) {
+        RemoteSettingsScreen(
+            onDismiss = { showRemoteSettings = false }
+        )
+    }
+
+    // === TV PICKER DIALOG ===
+    if (showTvPickerDialog) {
+        TvPickerDialog(
+            discoveredTvs = discoveredTvs,
+            savedTvs = savedTvs,
+            isScanning = isScanningTv,
+            onRefresh = { viewModel.scanTvs() },
+            onSelectDiscovered = { tv ->
+                showTvPickerDialog = false
+                // Coba connect langsung (ADB/Roku/Philips tidak butuh PIN)
+                pairingTvName = tv.displayName
+                pairingTv = tv
+                isPairingSubmitting = true
+                viewModel.connectToTv(tv, "") { success, message ->
+                    isPairingSubmitting = false
+                    if (success) {
+                        showRemoteDialog = true
+                        Toast.makeText(context, message, Toast.LENGTH_SHORT).show()
+                    } else {
+                        // Butuh PIN → munculkan PairingPinDialog
+                        showPairingDialog = true
+                    }
+                }
+            },
+            onSelectSaved = { tv ->
+                showTvPickerDialog = false
+                pairingTvName = tv.displayName
+                isPairingSubmitting = true
+                viewModel.connectToSavedTv(tv) { success, message ->
+                    isPairingSubmitting = false
+                    if (success) {
+                        showRemoteDialog = true
+                        Toast.makeText(context, message, Toast.LENGTH_SHORT).show()
+                    } else {
+                        // Kalau gagal, minta PIN (mungkin pairing sudah kadaluarsa)
+                        val discovered = DiscoveredTv(
+                            deviceId = tv.deviceId,
+                            name = tv.displayName,
+                            ip = tv.ipAddress,
+                            port = tv.port,
+                            brand = tv.brand,
+                            protocol = tv.protocol
+                        )
+                        pairingTv = discovered
+                        showPairingDialog = true
+                    }
+                }
+            },
+            onDeleteSaved = { tv -> viewModel.forgetTv(tv) },
+            onDismiss = { showTvPickerDialog = false }
+        )
+    }
+
+    // === MANUAL IP DIALOG ===
+    if (showManualIpDialog) {
+        ManualIpDialog(
+            onSubmit = { ip, port ->
+                showManualIpDialog = false
+                val manualTv = DiscoveredTv(
+                    deviceId = "manual_${ip}_$port",
+                    name = "TV Manual ($ip)",
+                    ip = ip,
+                    port = port,
+                    brand = "ANDROID_TV",
+                    protocol = "ANDROID_TV_V2"
+                )
+                pairingTvName = manualTv.displayName
+                pairingTv = manualTv
+                isPairingSubmitting = true
+                viewModel.connectToTv(manualTv, "") { success, message ->
+                    isPairingSubmitting = false
+                    if (success) {
+                        showRemoteDialog = true
+                        Toast.makeText(context, message, Toast.LENGTH_SHORT).show()
+                    } else {
+                        showPairingDialog = true
+                    }
+                }
+            },
+            onDismiss = { showManualIpDialog = false }
+        )
+    }
+
+    // === PAIRING PIN DIALOG ===
+    if (showPairingDialog) {
+        PairingPinDialog(
+            tvName = pairingTvName,
+            isSubmitting = isPairingSubmitting,
+            errorMessage = pairingError,
+            onSubmit = { pin ->
+                val tv = pairingTv ?: return@PairingPinDialog
+                isPairingSubmitting = true
+                pairingError = ""
+                viewModel.connectToTv(tv, pin) { success, message ->
+                    isPairingSubmitting = false
+                    if (success) {
+                        showPairingDialog = false
+                        showTvPickerDialog = false
+                        showRemoteDialog = true
+                        Toast.makeText(context, message, Toast.LENGTH_SHORT).show()
+                    } else {
+                        pairingError = message
+                    }
+                }
+            },
+            onCancel = {
+                showPairingDialog = false
+                pairingError = ""
+                pairingTv = null
+            }
+        )
+    }
+
+    // === INFO TV DIALOG ===
+    if (showInfoTvDialog) {
+        val state = viewModel.remoteController.connectionState.collectAsState().value
+        InfoTvDialog(
+            tvName = state.tv?.displayName ?: infoTvName,
+            brand = state.tv?.brand ?: "UNKNOWN",
+            protocolName = state.protocolName,
+            ipAddress = state.tv?.ip ?: "",
+            port = state.tv?.port ?: 0,
+            isConnected = state.isConnected,
+            onReconnect = {
+                showInfoTvDialog = false
+                val tv = state.tv
+                if (tv != null) {
+                    viewModel.connectToTv(tv, "") { _, _ -> }
+                }
+            },
+            onForget = {
+                showInfoTvDialog = false
+                val state2 = viewModel.remoteController.connectionState.value
+                val tvId = state2.tv?.deviceId ?: ""
+                val found = savedTvs.firstOrNull { it.deviceId == tvId }
+                if (found != null) viewModel.forgetTv(found)
+            },
+            onDismiss = { showInfoTvDialog = false }
+        )
+    }
+
+    // === INPUT SOURCE DIALOG ===
+    if (showInputSourceDialog) {
+        InputSourceDialog(
+            onSelect = { cmd ->
+                showInputSourceDialog = false
+                viewModel.sendTvCommand(cmd)
+            },
+            onDismiss = { showInputSourceDialog = false }
+        )
+    }
+
+    // === SHORTCUT DIALOG ===
+    if (showShortcutDialog) {
+        val shortcuts = listOf(
+            "YouTube" to "com.google.android.youtube.tv",
+            "Netflix" to "com.netflix.ninja",
+            "Prime Video" to "com.amazon.amazonvideo.livingroom",
+            "Disney+" to "com.disney.disneyplus",
+            "Spotify" to "com.spotify.tv.android",
+            "VLC" to "org.videolan.vlc",
+            "Plex" to "com.plexapp.android",
+            "Chrome" to "com.android.chrome"
+        )
+        ShortcutDialog(
+            shortcuts = shortcuts,
+            onLaunch = { _, pkg ->
+                showShortcutDialog = false
+                viewModel.sendTvCommand(TvCommand.LAUNCH_APP, pkg)
+            },
+            onDismiss = { showShortcutDialog = false }
+        )
+    }
+
+    // === LAUNCHER OVERLAY DIALOG ===
     if (showLauncherOverlay) {
         StabiloLauncherDialog(
             onOpenApps = { viewModel.loadPane1("APPLICATIONS"); showLauncherOverlay = false },
@@ -398,6 +700,7 @@ fun MainScreen(viewModel: MainViewModel) {
         )
     }
 
+    // === WIFI SHARE DIALOG ===
     if (showWifiDialog) {
         WifiShareDialog(
             serverConfig = serverConfig,
@@ -414,6 +717,7 @@ fun MainScreen(viewModel: MainViewModel) {
         )
     }
 
+    // === CONTEXT MENU FILE ===
     contextMenuItem?.let { item ->
         FileContextMenuDialog(
             item = item,
@@ -430,6 +734,7 @@ fun MainScreen(viewModel: MainViewModel) {
         )
     }
 
+    // === RENAME DIALOG ===
     renameTargetItem?.let { item ->
         RenameDialog(
             initialName = item.name,
@@ -438,6 +743,7 @@ fun MainScreen(viewModel: MainViewModel) {
         )
     }
 
+    // === BATCH RENAME DIALOG ===
     if (showBatchRenameDialog) {
         BatchRenameDialog(
             fileCount = pane1SelectedCount,
@@ -446,6 +752,7 @@ fun MainScreen(viewModel: MainViewModel) {
         )
     }
 
+    // === ACTIVE VIEWERS ===
     when (val viewer = activeViewer) {
         is ActiveViewer.Video -> VideoPlayerDialog(viewer.path, viewer.name, onDismiss = { viewModel.closeViewer() })
         is ActiveViewer.Image -> ImageViewerDialog(viewer.path, viewer.name, viewer.imageList, onDismiss = { viewModel.closeViewer() })
@@ -463,6 +770,11 @@ fun MainScreen(viewModel: MainViewModel) {
         else -> {}
     }
 }
+
+// ==========================================================
+// COMPOSABLE HELPER
+// ==========================================================
+
 @Composable
 fun ConnectionStatusDot(isConnected: Boolean, onClick: () -> Unit) {
     val dotColor = if (isConnected) Color(0xFF22C55E) else TextMuted
