@@ -18,6 +18,8 @@ room = "2.6.1"
 jmdns = "3.5.9"
 datastore = "1.1.1"
 ksp = "2.0.20-1.0.25"
+protobuf = "3.25.3"
+protobufPlugin = "0.9.4"
 
 [libraries]
 # AndroidX Core
@@ -38,7 +40,7 @@ androidx-navigation-compose = { group = "androidx.navigation", name = "navigatio
 # Coroutines
 kotlinx-coroutines-android = { group = "org.jetbrains.kotlinx", name = "kotlinx-coroutines-android", version.ref = "coroutines" }
 
-# Ktor (Embedded Server)
+# Ktor
 ktor-server-core = { group = "io.ktor", name = "ktor-server-core", version.ref = "ktor" }
 ktor-server-netty = { group = "io.ktor", name = "ktor-server-netty", version.ref = "ktor" }
 ktor-server-content-negotiation = { group = "io.ktor", name = "ktor-server-content-negotiation", version.ref = "ktor" }
@@ -59,25 +61,19 @@ androidx-documentfile = { group = "androidx.documentfile", name = "documentfile"
 # Accompanist Permissions
 accompanist-permissions = { group = "com.google.accompanist", name = "accompanist-permissions", version.ref = "accompanistPermissions" }
 
-# ==== REMOTE TV LIBRARIES ====
-
-# OkHttp (WebSocket Samsung, LG, Roku)
+# ==== REMOTE TV — CORE ====
 okhttp = { group = "com.squareup.okhttp3", name = "okhttp", version.ref = "okhttp" }
-
-# Moshi (JSON parsing)
+okhttp-tls = { group = "com.squareup.okhttp3", name = "okhttp-tls", version.ref = "okhttp" }
 moshi = { group = "com.squareup.moshi", name = "moshi", version.ref = "moshi" }
 moshi-kotlin = { group = "com.squareup.moshi", name = "moshi-kotlin", version.ref = "moshi" }
-
-# Room (Database TV terdaftar)
 room-runtime = { group = "androidx.room", name = "room-runtime", version.ref = "room" }
 room-ktx = { group = "androidx.room", name = "room-ktx", version.ref = "room" }
 room-compiler = { group = "androidx.room", name = "room-compiler", version.ref = "room" }
-
-# mDNS (Discovery Android TV)
 jmdns = { group = "org.jmdns", name = "jmdns", version.ref = "jmdns" }
-
-# DataStore (Pengaturan)
 androidx-datastore-preferences = { group = "androidx.datastore", name = "datastore-preferences", version.ref = "datastore" }
+
+# ==== REMOTE TV — PROTOKOL TAMBAHAN ====
+protobuf-javalite = { group = "com.google.protobuf", name = "protobuf-javalite", version.ref = "protobuf" }
 
 [plugins]
 android-application = { id = "com.android.application", version.ref = "agp" }
