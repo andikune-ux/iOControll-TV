@@ -33,8 +33,11 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -48,7 +51,6 @@ import androidx.compose.ui.unit.sp
 import dev.andikuneiocontroll.ui.theme.DarkBgCardElevated
 import dev.andikuneiocontroll.ui.theme.StabiloCyan
 import dev.andikuneiocontroll.ui.theme.StabiloLime
-import dev.andikuneiocontroll.ui.theme.StabiloPink
 import dev.andikuneiocontroll.ui.theme.StabiloYellow
 import dev.andikuneiocontroll.ui.theme.TextPrimary
 import dev.andikuneiocontroll.ui.theme.TextSecondary
@@ -156,7 +158,7 @@ fun RemoteMouse(
     onDoubleClick: () -> Unit,
     modifier: Modifier = Modifier
 ) {
-    var lastTapTime by remember { mutableStateOf(0L) }
+    var lastTapTime by remember { mutableLongStateOf(0L) }
 
     Box(
         modifier = modifier
@@ -184,11 +186,21 @@ fun RemoteMouse(
         contentAlignment = Alignment.Center
     ) {
         Column(horizontalAlignment = Alignment.CenterHorizontally) {
-            Icon(Icons.Default.Mouse, "Mouse", tint = StabiloCyan.copy(alpha = 0.5f), modifier = Modifier.size(60.dp))
+            Icon(
+                Icons.Default.Mouse,
+                "Mouse",
+                tint = StabiloCyan.copy(alpha = 0.5f),
+                modifier = Modifier.size(60.dp)
+            )
             Spacer(modifier = Modifier.height(12.dp))
             Text("Touchpad", color = TextPrimary, fontSize = 16.sp, fontWeight = FontWeight.Bold)
             Spacer(modifier = Modifier.height(6.dp))
-            Text("Drag = gerakkan kursor\nTap = klik\nDouble tap = klik 2x", color = TextSecondary, fontSize = 11.sp, textAlign = TextAlign.Center)
+            Text(
+                "Drag = gerakkan kursor\nTap = klik\nDouble tap = klik 2x",
+                color = TextSecondary,
+                fontSize = 11.sp,
+                textAlign = TextAlign.Center
+            )
         }
     }
 }
@@ -214,7 +226,7 @@ fun RemoteGesture(
             .border(1.5.dp, StabiloYellow.copy(alpha = 0.5f), RoundedCornerShape(16.dp))
             .pointerInput(Unit) {
                 detectDragGestures(
-                    onDragEnd = { /* reset */ },
+                    onDragEnd = { },
                     onDrag = { change, dragAmount ->
                         change.consume()
                         val dx = dragAmount.x
@@ -234,11 +246,21 @@ fun RemoteGesture(
         contentAlignment = Alignment.Center
     ) {
         Column(horizontalAlignment = Alignment.CenterHorizontally) {
-            Icon(Icons.Default.ScreenRotation, "Gesture", tint = StabiloYellow.copy(alpha = 0.5f), modifier = Modifier.size(60.dp))
+            Icon(
+                Icons.Default.ScreenRotation,
+                "Gesture",
+                tint = StabiloYellow.copy(alpha = 0.5f),
+                modifier = Modifier.size(60.dp)
+            )
             Spacer(modifier = Modifier.height(12.dp))
             Text("Gesture Area", color = TextPrimary, fontSize = 16.sp, fontWeight = FontWeight.Bold)
             Spacer(modifier = Modifier.height(6.dp))
-            Text("Swipe 4 arah = D-Pad\nTap = OK", color = TextSecondary, fontSize = 11.sp, textAlign = TextAlign.Center)
+            Text(
+                "Swipe 4 arah = D-Pad\nTap = OK",
+                color = TextSecondary,
+                fontSize = 11.sp,
+                textAlign = TextAlign.Center
+            )
         }
     }
 }
@@ -263,6 +285,7 @@ fun RemoteAirMouse(
         if (gyro != null) {
             val listener = object : SensorEventListener {
                 private var lastTime = 0L
+
                 override fun onSensorChanged(event: SensorEvent?) {
                     if (!isActive || event == null) return
                     val now = System.currentTimeMillis()
@@ -280,6 +303,7 @@ fun RemoteAirMouse(
                     }
                     if (abs(dx) > 0.5f || abs(dy) > 0.5f) onMove(dx, dy)
                 }
+
                 override fun onAccuracyChanged(sensor: Sensor?, accuracy: Int) {}
             }
             sensorManager.registerListener(listener, gyro, SensorManager.SENSOR_DELAY_GAME)
@@ -303,11 +327,21 @@ fun RemoteAirMouse(
         contentAlignment = Alignment.Center
     ) {
         Column(horizontalAlignment = Alignment.CenterHorizontally) {
-            Icon(Icons.Default.Sensors, "Air Mouse", tint = StabiloCyan.copy(alpha = 0.6f), modifier = Modifier.size(60.dp))
+            Icon(
+                Icons.Default.Sensors,
+                "Air Mouse",
+                tint = StabiloCyan.copy(alpha = 0.6f),
+                modifier = Modifier.size(60.dp)
+            )
             Spacer(modifier = Modifier.height(12.dp))
             Text("Air Mouse Aktif", color = StabiloCyan, fontSize = 16.sp, fontWeight = FontWeight.Bold)
             Spacer(modifier = Modifier.height(6.dp))
-            Text("Gerakkan HP untuk\nmenggerakkan kursor TV\n\nTap = klik", color = TextSecondary, fontSize = 11.sp, textAlign = TextAlign.Center)
+            Text(
+                "Gerakkan HP untuk\nmenggerakkan kursor TV\n\nTap = klik",
+                color = TextSecondary,
+                fontSize = 11.sp,
+                textAlign = TextAlign.Center
+            )
         }
     }
 }
