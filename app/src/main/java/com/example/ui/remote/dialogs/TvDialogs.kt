@@ -110,15 +110,16 @@ fun TvPickerDialog(
                     modifier = Modifier.fillMaxWidth().height(46.dp)
                 ) {
                     if (isScanning) {
-                        CircularProgressIndicator(color = Color.Black, strokeWidth = 2.dp, modifier = Modifier.size(20.dp))
+                        CircularProgressIndicator(
+                            color = Color.Black, strokeWidth = 2.dp, modifier = Modifier.size(20.dp)
+                        )
                     } else {
                         Icon(Icons.Default.Refresh, null, tint = Color.Black)
                     }
                     Spacer(modifier = Modifier.width(8.dp))
                     Text(
                         if (isScanning) "Mencari TV…" else "Scan Ulang",
-                        color = Color.Black,
-                        fontWeight = FontWeight.Bold
+                        color = Color.Black, fontWeight = FontWeight.Bold
                     )
                 }
 
@@ -133,11 +134,7 @@ fun TvPickerDialog(
                 ) {
                     Icon(Icons.Default.Link, null, tint = StabiloCyan, modifier = Modifier.size(20.dp))
                     Spacer(modifier = Modifier.width(8.dp))
-                    Text(
-                        "Hubungkan via IP Manual",
-                        color = StabiloCyan,
-                        fontWeight = FontWeight.Bold
-                    )
+                    Text("Hubungkan via IP Manual", color = StabiloCyan, fontWeight = FontWeight.Bold)
                 }
 
                 Spacer(modifier = Modifier.height(12.dp))
@@ -149,16 +146,17 @@ fun TvPickerDialog(
                     if (savedTvs.isNotEmpty()) {
                         item {
                             Text(
-                                "TERSIMPAN",
-                                color = StabiloCyan,
-                                fontSize = 11.sp,
-                                fontWeight = FontWeight.Bold,
-                                letterSpacing = 1.sp,
+                                "TERSIMPAN", color = StabiloCyan, fontSize = 11.sp,
+                                fontWeight = FontWeight.Bold, letterSpacing = 1.sp,
                                 modifier = Modifier.padding(start = 4.dp, top = 4.dp, bottom = 4.dp)
                             )
                         }
                         items(savedTvs, key = { "saved_${it.id}" }) { tv ->
-                            SavedTvItem(tv = tv, onClick = { onSelectSaved(tv) }, onDelete = { onDeleteSaved(tv) })
+                            SavedTvItem(
+                                tv = tv,
+                                onClick = { onSelectSaved(tv) },
+                                onDelete = { onDeleteSaved(tv) }
+                            )
                         }
                     }
 
@@ -167,10 +165,8 @@ fun TvPickerDialog(
                             Spacer(modifier = Modifier.height(8.dp))
                             Text(
                                 "DITEMUKAN (${discoveredTvs.size})",
-                                color = StabiloYellow,
-                                fontSize = 11.sp,
-                                fontWeight = FontWeight.Bold,
-                                letterSpacing = 1.sp,
+                                color = StabiloYellow, fontSize = 11.sp,
+                                fontWeight = FontWeight.Bold, letterSpacing = 1.sp,
                                 modifier = Modifier.padding(start = 4.dp, top = 4.dp, bottom = 4.dp)
                             )
                         }
@@ -187,13 +183,14 @@ fun TvPickerDialog(
                             ) {
                                 Icon(Icons.Default.Wifi, null, tint = TextMuted, modifier = Modifier.size(40.dp))
                                 Spacer(modifier = Modifier.height(12.dp))
-                                Text("Tidak ada TV ditemukan", color = TextSecondary, fontSize = 13.sp, fontWeight = FontWeight.Bold)
+                                Text(
+                                    "Tidak ada TV ditemukan",
+                                    color = TextSecondary, fontSize = 13.sp, fontWeight = FontWeight.Bold
+                                )
                                 Spacer(modifier = Modifier.height(4.dp))
                                 Text(
                                     "Cek koneksi WiFi\natau gunakan IP Manual",
-                                    color = TextMuted,
-                                    fontSize = 11.sp,
-                                    textAlign = TextAlign.Center
+                                    color = TextMuted, fontSize = 11.sp, textAlign = TextAlign.Center
                                 )
                             }
                         }
@@ -203,6 +200,7 @@ fun TvPickerDialog(
         }
     }
 }
+
 @Composable
 private fun SavedTvItem(
     tv: TvEntity,
@@ -265,7 +263,6 @@ private fun DiscoveredTvItem(tv: DiscoveredTv, onClick: () -> Unit) {
         }
     }
 }
-
 // ==========================================================
 // 2. PAIRING PIN DIALOG
 // ==========================================================
@@ -296,9 +293,7 @@ fun PairingPinDialog(
                 Spacer(modifier = Modifier.height(6.dp))
                 Text(
                     "TV \"$tvName\" menampilkan PIN.\nMasukkan PIN di bawah:",
-                    color = TextSecondary,
-                    fontSize = 12.sp,
-                    textAlign = TextAlign.Center
+                    color = TextSecondary, fontSize = 12.sp, textAlign = TextAlign.Center
                 )
                 Spacer(modifier = Modifier.height(16.dp))
 
@@ -340,7 +335,9 @@ fun PairingPinDialog(
                         modifier = Modifier.weight(1f).height(46.dp)
                     ) {
                         if (isSubmitting) {
-                            CircularProgressIndicator(color = Color.Black, strokeWidth = 2.dp, modifier = Modifier.size(18.dp))
+                            CircularProgressIndicator(
+                                color = Color.Black, strokeWidth = 2.dp, modifier = Modifier.size(18.dp)
+                            )
                         } else {
                             Text("Hubungkan", color = Color.Black, fontWeight = FontWeight.Bold)
                         }
@@ -362,6 +359,8 @@ fun InfoTvDialog(
     ipAddress: String,
     port: Int,
     isConnected: Boolean,
+    hasChromecast: Boolean = false,
+    firmwareVersion: String = "",
     onReconnect: () -> Unit,
     onForget: () -> Unit,
     onDismiss: () -> Unit
@@ -386,12 +385,36 @@ fun InfoTvDialog(
 
                 Spacer(modifier = Modifier.height(12.dp))
 
-                InfoRow("Nama", tvName)
-                InfoRow("Brand", brand)
-                InfoRow("Protokol", protocolName)
-                InfoRow("IP", ipAddress)
-                InfoRow("Port", port.toString())
+                InfoRow("Nama", tvName.ifBlank { "-" })
+                InfoRow("Brand", brand.ifBlank { "UNKNOWN" })
+                InfoRow("Protokol", protocolName.ifBlank { "-" })
+                InfoRow("IP", ipAddress.ifBlank { "-" })
+                InfoRow("Port", if (port > 0) port.toString() else "-")
                 InfoRow("Status", if (isConnected) "Terhubung" else "Terputus")
+
+                if (firmwareVersion.isNotBlank()) {
+                    InfoRow("Firmware", firmwareVersion)
+                }
+
+                if (hasChromecast) {
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clip(RoundedCornerShape(8.dp))
+                            .background(StabiloLime.copy(alpha = 0.15f))
+                            .border(1.dp, StabiloLime.copy(alpha = 0.5f), RoundedCornerShape(8.dp))
+                            .padding(horizontal = 10.dp, vertical = 6.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Icon(Icons.Default.Cast, null, tint = StabiloLime, modifier = Modifier.size(16.dp))
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text(
+                            "Chromecast Built-in Tersedia",
+                            color = StabiloLime, fontSize = 11.sp, fontWeight = FontWeight.Bold
+                        )
+                    }
+                }
 
                 Spacer(modifier = Modifier.height(16.dp))
 
@@ -428,6 +451,7 @@ private fun InfoRow(label: String, value: String) {
         Text(value, color = TextPrimary, fontSize = 13.sp, fontWeight = FontWeight.Medium)
     }
 }
+
 // ==========================================================
 // 4. INPUT SOURCE DIALOG
 // ==========================================================
@@ -472,18 +496,26 @@ fun InputSourceDialog(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
-                        row.forEach { (label, cmd, icon) ->
+                        row.forEach { item ->
+                            val label = item.first
+                            val cmd = item.second
+                            val icon = item.third
                             Button(
                                 onClick = { onSelect(cmd) },
                                 colors = ButtonDefaults.buttonColors(containerColor = DarkBgCardElevated),
                                 shape = RoundedCornerShape(10.dp),
-                                border = androidx.compose.foundation.BorderStroke(1.dp, StabiloYellow.copy(alpha = 0.3f)),
+                                border = androidx.compose.foundation.BorderStroke(
+                                    1.dp, StabiloYellow.copy(alpha = 0.3f)
+                                ),
                                 modifier = Modifier.weight(1f).height(60.dp)
                             ) {
                                 Column(horizontalAlignment = Alignment.CenterHorizontally) {
                                     Icon(icon, null, tint = StabiloYellow, modifier = Modifier.size(18.dp))
                                     Spacer(modifier = Modifier.height(2.dp))
-                                    Text(label, color = TextPrimary, fontSize = 11.sp, fontWeight = FontWeight.Medium)
+                                    Text(
+                                        label, color = TextPrimary, fontSize = 11.sp,
+                                        fontWeight = FontWeight.Medium
+                                    )
                                 }
                             }
                         }
@@ -497,7 +529,6 @@ fun InputSourceDialog(
         }
     }
 }
-
 // ==========================================================
 // 5. SHORTCUT DIALOG
 // ==========================================================
@@ -547,13 +578,26 @@ fun ShortcutDialog(
                                 verticalAlignment = Alignment.CenterVertically
                             ) {
                                 Box(
-                                    modifier = Modifier.size(36.dp).clip(CircleShape).background(StabiloPink.copy(alpha = 0.15f)),
+                                    modifier = Modifier
+                                        .size(36.dp)
+                                        .clip(CircleShape)
+                                        .background(StabiloPink.copy(alpha = 0.15f)),
                                     contentAlignment = Alignment.Center
                                 ) {
-                                    Icon(Icons.Default.SettingsRemote, null, tint = StabiloPink, modifier = Modifier.size(18.dp))
+                                    Icon(
+                                        Icons.Default.SettingsRemote,
+                                        null,
+                                        tint = StabiloPink,
+                                        modifier = Modifier.size(18.dp)
+                                    )
                                 }
                                 Spacer(modifier = Modifier.width(12.dp))
-                                Text(name, color = TextPrimary, fontWeight = FontWeight.Medium, fontSize = 14.sp)
+                                Text(
+                                    name,
+                                    color = TextPrimary,
+                                    fontWeight = FontWeight.Medium,
+                                    fontSize = 14.sp
+                                )
                             }
                         }
                     }
