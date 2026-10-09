@@ -20,13 +20,21 @@ import java.net.Socket
 
 data class ClientConnectionState(
     val isConnected: Boolean = false,
-    val isPaired: Boolean = false,
     val targetIp: String = "",
     val targetPort: Int = 23017,
+    val targetName: String = "",
     val errorMessage: String = "",
     val isAirMouseActive: Boolean = false
 )
 
+/**
+ * RemoteClient — Client di HP.
+ *
+ * V1.00.001 (Updated):
+ * - Hapus pairing code (auto-accept, sesuai Zank Remote)
+ * - Tambah auto-discovery via UDP Broadcast (RemoteDiscovery)
+ * - Connect langsung pakai IP:port dari hasil discovery
+ */
 class RemoteClient(
     private val context: Context,
     private val scope: CoroutineScope
@@ -39,13 +47,50 @@ class RemoteClient(
     private val _connectionState = MutableStateFlow(ClientConnectionState())
     val connectionState: StateFlow<ClientConnectionState> = _connectionState
 
-    private val sensorManager = context.getSystemService(Context.SENSOR_SERVICE) as? SensorManager
+    // Auto-discovery
+    val discovery = RemoteDiscovery(context, scope)
+
+    private val sensorManager =
+        context.getSystemService(Context.SENSOR_SERVICE) as? SensorManager
     private val gyroSensor = sensorManager?.getDefaultSensor(Sensor.TYPE_GYROSCOPE)
         ?: sensorManager?.getDefaultSensor(Sensor.TYPE_ACCELEROMETER)
 
     private var lastSendTime = 0L
+    private var readerJob: Job? = null
 
-    fun connect(targetIp: String, port: Int = 23017, pairingCode: String, onResult: (Boolean, String) -> Unit) {
+    // ==========================================================
+    // AUTO-DISCOVERY
+    // ==========================================================
+
+    /**
+     * Mulai scan TV di WiFi yang sama. Hasil muncul di [discovery.discoveredTvs].
+     * Scan otomatis berhenti setelah ~3 detik.
+     */
+    fun startAutoScan() {
+        discovery.startScan()
+    }
+
+    fun stopAutoScan() {
+        discovery.stopScan()
+    }
+
+    /**
+     * Connect langsung ke TV hasil discovery (tanpa pairing).
+     */
+    fun connectToTv(tv: DiscoveredTv, onResult: (Boolean, String) -> Unit) {
+        connect(tv.ip, tv.remotePort, tv.name, onResult)
+    }
+
+    // ==========================================================
+    // CONNECT / DISCONNECT
+    // ==========================================================
+
+    fun connect(
+        targetIp: String,
+        port: Int = 23017,
+        targetName: String = "",
+        onResult: (Boolean, String) -> Unit
+    ) {
         disconnect()
 
         scope.launch(Dispatchers.IO) {
@@ -55,38 +100,52 @@ class RemoteClient(
                 val w = PrintWriter(s.getOutputStream(), true)
                 val r = BufferedReader(InputStreamReader(s.getInputStream()))
 
-                // Send pairing code
-                w.println("PAIR|$pairingCode")
+                // Baca balasan pertama (auto-accept di sisi TV)
                 val response = r.readLine()
 
-                if (response == "PAIR_OK") {
+                if (response == "CONNECT_OK") {
                     socket = s
                     writer = w
                     reader = r
+
                     withContext(Dispatchers.Main) {
                         _connectionState.value = ClientConnectionState(
                             isConnected = true,
-                            isPaired = true,
                             targetIp = targetIp,
-                            targetPort = port
+                            targetPort = port,
+                            targetName = targetName
                         )
-                        onResult(true, "Terhubung ke TV ($targetIp)")
+                        onResult(true, "Terhubung ke ${targetName.ifBlank { targetIp }}")
+                    }
+
+                    // Loop baca balasan dari server (biar socket tidak EOF)
+                    readerJob = scope.launch(Dispatchers.IO) {
+                        try {
+                            while (true) {
+                                val line = r.readLine() ?: break
+                                // Balasan "OK" diabaikan
+                            }
+                        } catch (_: Exception) {}
+                        // Kalau server putus
+                        withContext(Dispatchers.Main) {
+                            if (_connectionState.value.isConnected) {
+                                _connectionState.value = ClientConnectionState()
+                            }
+                        }
                     }
                 } else {
                     s.close()
                     withContext(Dispatchers.Main) {
                         _connectionState.value = ClientConnectionState(
-                            isConnected = false,
-                            errorMessage = "Kode pairing salah atau ditolak"
+                            errorMessage = "TV menolak koneksi"
                         )
-                        onResult(false, "Kode pairing salah!")
+                        onResult(false, "TV menolak koneksi")
                     }
                 }
             } catch (e: Exception) {
                 e.printStackTrace()
                 withContext(Dispatchers.Main) {
                     _connectionState.value = ClientConnectionState(
-                        isConnected = false,
                         errorMessage = "Gagal terhubung: ${e.message}"
                     )
                     onResult(false, "Koneksi gagal: ${e.message}")
@@ -97,25 +156,29 @@ class RemoteClient(
 
     fun disconnect() {
         disableAirMouse()
+        readerJob?.cancel()
+        readerJob = null
         try {
             writer?.close()
             reader?.close()
             socket?.close()
-        } catch (e: Exception) {
-            e.printStackTrace()
-        }
+        } catch (_: Exception) {}
         socket = null
         writer = null
         reader = null
         _connectionState.value = ClientConnectionState()
     }
 
+    // ==========================================================
+    // COMMAND
+    // ==========================================================
+
     fun sendCommand(command: String, payload: String = "") {
-        if (writer == null) return
+        val w = writer ?: return
         scope.launch(Dispatchers.IO) {
             try {
                 val fullMsg = if (payload.isEmpty()) command else "$command|$payload"
-                writer?.println(fullMsg)
+                w.println(fullMsg)
             } catch (e: Exception) {
                 e.printStackTrace()
             }
@@ -123,15 +186,19 @@ class RemoteClient(
     }
 
     fun sendMouseMove(dx: Float, dy: Float) {
-        if (writer == null) return
+        val w = writer ?: return
         scope.launch(Dispatchers.IO) {
             try {
-                writer?.println("MOUSE_MOVE|$dx|$dy")
+                w.println("MOUSE_MOVE|$dx|$dy")
             } catch (e: Exception) {
                 e.printStackTrace()
             }
         }
     }
+
+    // ==========================================================
+    // AIR MOUSE
+    // ==========================================================
 
     fun enableAirMouse(): Boolean {
         if (gyroSensor == null || sensorManager == null) return false
@@ -150,17 +217,15 @@ class RemoteClient(
     override fun onSensorChanged(event: SensorEvent?) {
         if (event == null || !_connectionState.value.isAirMouseActive) return
         val now = System.currentTimeMillis()
-        if (now - lastSendTime < 35) return // Throttle ~30fps
+        if (now - lastSendTime < 35) return // throttle ~30fps
         lastSendTime = now
 
         val dx: Float
         val dy: Float
         if (event.sensor.type == Sensor.TYPE_GYROSCOPE) {
-            // Gyroscope values in rad/s
             dx = -event.values[2] * 25f
             dy = -event.values[0] * 25f
         } else {
-            // Accelerometer fallback
             dx = -event.values[0] * 8f
             dy = event.values[1] * 8f
         }
