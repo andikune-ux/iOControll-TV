@@ -1,6 +1,7 @@
 package dev.andikuneiocontroll.ui.remote.components
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -33,12 +34,6 @@ import dev.andikuneiocontroll.ui.theme.StabiloPink
 import dev.andikuneiocontroll.ui.theme.TextPrimary
 import dev.andikuneiocontroll.ui.theme.TextSecondary
 
-/**
- * RemoteHeader — Header atas remote TV.
- *
- * Layout:
- * [⬅️ Back]  [Nama TV + Status]  [⚙️ Settings] [🔴 Power]
- */
 @Composable
 fun RemoteHeader(
     tvName: String,
@@ -46,6 +41,7 @@ fun RemoteHeader(
     isConnected: Boolean,
     latencyMs: Int = 0,
     onBack: () -> Unit,
+    onNameClick: () -> Unit = {},
     onSettings: () -> Unit,
     onPower: () -> Unit,
     modifier: Modifier = Modifier
@@ -57,7 +53,6 @@ fun RemoteHeader(
             .padding(horizontal = 8.dp, vertical = 8.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
-        // Tombol Back (kembali ke file manager)
         IconButton(
             onClick = onBack,
             modifier = Modifier
@@ -74,9 +69,13 @@ fun RemoteHeader(
 
         Spacer(modifier = Modifier.width(8.dp))
 
-        // Nama TV + Status
+        // Nama TV + Status (KLIKABLE)
         Column(
-            modifier = Modifier.weight(1f),
+            modifier = Modifier
+                .weight(1f)
+                .clip(CircleShape)
+                .clickable(onClick = onNameClick)
+                .padding(vertical = 4.dp, horizontal = 4.dp),
             verticalArrangement = Arrangement.Center
         ) {
             Text(
@@ -88,7 +87,6 @@ fun RemoteHeader(
             )
 
             Row(verticalAlignment = Alignment.CenterVertically) {
-                // Dot status
                 Box(
                     modifier = Modifier
                         .size(7.dp)
@@ -118,7 +116,6 @@ fun RemoteHeader(
 
         Spacer(modifier = Modifier.width(8.dp))
 
-        // Tombol Settings
         IconButton(
             onClick = onSettings,
             modifier = Modifier
@@ -133,7 +130,6 @@ fun RemoteHeader(
             )
         }
 
-        // Tombol Power (merah)
         IconButton(
             onClick = onPower,
             modifier = Modifier
