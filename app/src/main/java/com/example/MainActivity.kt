@@ -68,10 +68,19 @@ private fun AppNavigationFlow(viewModel: MainViewModel) {
         AppState.Splash -> {
             SplashScreen(
                 onFinished = {
-                    currentState = when {
-                        onboardingDone == true -> AppState.Main
-                        onboardingDone == false -> AppState.Onboarding
-                        else -> AppState.Main  // fallback kalau null
+                    scope.launch {
+                        // Auto-connect ke TV terakhir (kalau fitur aktif)
+                        val autoConnect = prefs.getAutoConnectOnce()
+                        if (autoConnect) {
+                            viewModel.autoConnectLastTv()
+                        }
+
+                        // Tentukan state berikutnya
+                        currentState = when {
+                            onboardingDone == true -> AppState.Main
+                            onboardingDone == false -> AppState.Onboarding
+                            else -> AppState.Main
+                        }
                     }
                 }
             )
