@@ -134,15 +134,15 @@ fun RemoteTvDialog(
             ) {
                 // Header
                 RemoteHeader(
-                    tvName = connectionState.tv?.displayName ?: "Belum Terhubung",
-                    protocolName = connectionState.protocolName,
-                    isConnected = connectionState.isConnected,
-                    latencyMs = 0,
-                    onBack = onDismiss,
-                    onSettings = onOpenSettings,
-                    onPower = { send(TvCommand.POWER) }
-                )
-
+    tvName = connectionState.tv?.displayName ?: "Belum Terhubung",
+    protocolName = connectionState.protocolName,
+    isConnected = connectionState.isConnected,
+    latencyMs = 0,
+    onBack = onDismiss,
+    onNameClick = onOpenInfoTv,
+    onSettings = onOpenSettings,
+    onPower = { send(TvCommand.POWER) }
+)
                 // Top Bar
                 RemoteTopBar(
                     onVoice = { send(TvCommand.VOICE_START) },
