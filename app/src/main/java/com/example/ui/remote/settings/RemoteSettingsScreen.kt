@@ -1,11 +1,11 @@
 package dev.andikuneiocontroll.ui.remote.settings
 
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -75,7 +75,7 @@ fun RemoteSettingsScreen(
 
     var airMouseSens by remember { mutableFloatStateOf(50f) }
     var mouseSens by remember { mutableFloatStateOf(40f) }
-    var buttonSize by remember { mutableFloatStateOf(1f) } // 0=SMALL, 1=MEDIUM, 2=LARGE
+    var buttonSize by remember { mutableFloatStateOf(1f) }
 
     Dialog(
         onDismissRequest = onDismiss,
@@ -118,7 +118,7 @@ fun RemoteSettingsScreen(
                         .verticalScroll(rememberScrollState())
                         .padding(16.dp)
                 ) {
-                    // ============ HAPTIC ============
+                    // HAPTIC
                     SettingToggleRow(
                         title = "Haptic Feedback",
                         subtitle = "Getar halus saat tombol ditekan",
@@ -132,7 +132,7 @@ fun RemoteSettingsScreen(
 
                     Spacer(modifier = Modifier.height(12.dp))
 
-                    // ============ SOUND ============
+                    // SOUND
                     SettingToggleRow(
                         title = "Sound Effect",
                         subtitle = "Bunyi saat tombol ditekan",
@@ -145,7 +145,7 @@ fun RemoteSettingsScreen(
 
                     Spacer(modifier = Modifier.height(12.dp))
 
-                    // ============ AUTO CONNECT ============
+                    // AUTO CONNECT
                     SettingToggleRow(
                         title = "Auto-Connect",
                         subtitle = "Otomatis connect ke TV terakhir",
@@ -158,7 +158,7 @@ fun RemoteSettingsScreen(
 
                     Spacer(modifier = Modifier.height(20.dp))
 
-                    // ============ SLIDER AIR MOUSE ============
+                    // SLIDER AIR MOUSE
                     SettingSlider(
                         title = "Sensitivitas Air Mouse",
                         value = airMouseSens,
@@ -171,7 +171,7 @@ fun RemoteSettingsScreen(
 
                     Spacer(modifier = Modifier.height(12.dp))
 
-                    // ============ SLIDER MOUSE ============
+                    // SLIDER MOUSE
                     SettingSlider(
                         title = "Sensitivitas Mouse",
                         value = mouseSens,
@@ -184,7 +184,7 @@ fun RemoteSettingsScreen(
 
                     Spacer(modifier = Modifier.height(20.dp))
 
-                    // ============ UKURAN TOMBOL ============
+                    // UKURAN TOMBOL
                     Text(
                         "Ukuran Tombol",
                         color = TextPrimary,
@@ -213,7 +213,7 @@ fun RemoteSettingsScreen(
 
                     Spacer(modifier = Modifier.height(24.dp))
 
-                    // ============ RESET ============
+                    // RESET
                     Button(
                         onClick = {
                             scope.launch {
@@ -312,7 +312,7 @@ private fun SettingSlider(
 }
 
 @Composable
-private fun SizeButton(
+private fun RowScope.SizeButton(
     label: String,
     selected: Boolean,
     accentColor: Color,
