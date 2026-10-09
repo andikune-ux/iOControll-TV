@@ -4,14 +4,23 @@ import android.content.Context
 import dev.andikuneiocontroll.remote.discovery.DiscoveredTv
 import dev.andikuneiocontroll.remote.protocol.TvCommand
 import dev.andikuneiocontroll.remote.protocol.TvProtocol
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 
 /**
- * AdbTvClient — implementasi TvProtocol untuk ADB over WiFi.
+ * AdbTvClient — implementasi TvProtocol untuk ADB over WiFi / Wireless Debugging.
  *
- * Syarat di TV:
- * - Developer Options aktif (tap Build Number 7x)
- * - ADB Debugging aktif
- * - TV & HP di WiFi yang sama
+ * V2 (Update):
+ * - Support Wireless Debugging pairing (Android 11+)
+ * - Kalau belum paired → return "PAIRING_NEEDED" + info pairing
+ * - Kalau sudah paired → langsung connect
+ *
+ * Skenario:
+ * 1. User pilih TV → connect() dipanggil tanpa pairing code
+ * 2. Kalau belum paired → error message: "Butuh pairing dulu"
+ * 3. MainScreen buka AdbPairingDialog
+ * 4. User input IP + Port + Code
+ * 5. pair() dipanggil → sukses → connect() dipanggil lagi
  */
 class AdbTvClient(private val context: Context) : TvProtocol {
 
@@ -19,6 +28,20 @@ class AdbTvClient(private val context: Context) : TvProtocol {
     override val brand: String = "ANDROID_TV"
 
     private val adbClient = AdbClient(context)
+
+    // Flag untuk sinyal ke MainScreen: butuh pairing
+    @Volatile
+    var needsPairing: Boolean = false
+        private set
+
+    // Info pairing: port + host yang perlu di-pair
+    @Volatile
+    var pairingHost: String = ""
+        private set
+
+    @Volatile
+    var pairingPort: Int = 0
+        private set
 
     override fun canHandle(tv: DiscoveredTv): Boolean {
         return tv.brand.uppercase() in listOf(
@@ -32,9 +55,59 @@ class AdbTvClient(private val context: Context) : TvProtocol {
         pairingCode: String,
         onResult: (Boolean, String) -> Unit
     ) {
-        val port = if (tv.port > 0 && tv.port == 5555) tv.port else 5555
-        val (success, message) = adbClient.connect(tv.ip, port)
-        onResult(success, message)
+        withContext(Dispatchers.IO) {
+            try {
+                // Reset flag
+                needsPairing = false
+                pairingHost = tv.ip
+                pairingPort = 0
+
+                // Cek apakah sudah pernah pairing
+                if (!adbClient.isPaired(tv.ip)) {
+                    // Belum paired → signal ke UI
+                    needsPairing = true
+                    pairingHost = tv.ip
+                    onResult(
+                        false,
+                        "PAIRING_NEEDED: Aktifkan Wireless Debugging di TV, lalu masukkan kode pairing."
+                    )
+                    return@withContext
+                }
+
+                // Sudah paired → connect
+                val port = if (tv.port > 0 && tv.port == 5555) tv.port else 5555
+                val (success, message) = adbClient.connect(tv.ip, port)
+
+                if (success) {
+                    onResult(true, message)
+                } else {
+                    // Kalau gagal & isPaired sudah true tapi tetap gagal →
+                    // mungkin pairing kadaluarsa
+                    if (message.contains("timeout", ignoreCase = true) ||
+                        message.contains("connect", ignoreCase = true)) {
+                        needsPairing = true
+                        pairingHost = tv.ip
+                        onResult(false, "PAIRING_NEEDED: Pairing kadaluarsa. Ulangi pairing.")
+                    } else {
+                        onResult(false, message)
+                    }
+                }
+            } catch (e: Exception) {
+                onResult(false, "Error: ${e.message}")
+            }
+        }
+    }
+
+    /**
+     * Pair ke TV. Dipanggil dari UI setelah user input code.
+     * Setelah pairing sukses, panggil connect() lagi.
+     */
+    suspend fun pair(
+        host: String,
+        pairingPort: Int,
+        pairingCode: String
+    ): Pair<Boolean, String> {
+        return adbClient.pair(host, pairingPort, pairingCode)
     }
 
     override suspend fun disconnect() {
@@ -56,49 +129,49 @@ class AdbTvClient(private val context: Context) : TvProtocol {
     private fun mapCommandToShell(command: String, payload: String): String? {
         return when (command) {
             // ============ NAVIGASI ============
-            TvCommand.DPAD_UP -> "input keyevent 19"        // KEYCODE_DPAD_UP
-            TvCommand.DPAD_DOWN -> "input keyevent 20"      // KEYCODE_DPAD_DOWN
-            TvCommand.DPAD_LEFT -> "input keyevent 21"      // KEYCODE_DPAD_LEFT
-            TvCommand.DPAD_RIGHT -> "input keyevent 22"     // KEYCODE_DPAD_RIGHT
-            TvCommand.DPAD_OK, TvCommand.DPAD_CENTER -> "input keyevent 23" // KEYCODE_DPAD_CENTER
+            TvCommand.DPAD_UP -> "input keyevent 19"
+            TvCommand.DPAD_DOWN -> "input keyevent 20"
+            TvCommand.DPAD_LEFT -> "input keyevent 21"
+            TvCommand.DPAD_RIGHT -> "input keyevent 22"
+            TvCommand.DPAD_OK, TvCommand.DPAD_CENTER -> "input keyevent 23"
 
             // ============ SYSTEM ============
-            TvCommand.HOME -> "input keyevent 3"            // KEYCODE_HOME
-            TvCommand.BACK -> "input keyevent 4"            // KEYCODE_BACK
-            TvCommand.RECENTS -> "input keyevent 187"       // KEYCODE_APP_SWITCH
-            TvCommand.NOTIFICATIONS -> "input keyevent 83"  // KEYCODE_NOTIFICATION
-            TvCommand.POWER -> "input keyevent 26"          // KEYCODE_POWER
+            TvCommand.HOME -> "input keyevent 3"
+            TvCommand.BACK -> "input keyevent 4"
+            TvCommand.RECENTS -> "input keyevent 187"
+            TvCommand.NOTIFICATIONS -> "input keyevent 83"
+            TvCommand.POWER -> "input keyevent 26"
             TvCommand.POWER_OFF -> "input keyevent 26"
             TvCommand.POWER_ON -> "input keyevent 26"
-            TvCommand.SLEEP -> "input keyevent 223"         // KEYCODE_SLEEP
-            TvCommand.WAKE -> "input keyevent 224"          // KEYCODE_WAKEUP
+            TvCommand.SLEEP -> "input keyevent 223"
+            TvCommand.WAKE -> "input keyevent 224"
 
             // ============ MEDIA ============
-            TvCommand.PLAY -> "input keyevent 126"          // KEYCODE_MEDIA_PLAY
-            TvCommand.PAUSE -> "input keyevent 127"         // KEYCODE_MEDIA_PAUSE
-            TvCommand.PLAY_PAUSE -> "input keyevent 85"     // KEYCODE_MEDIA_PLAY_PAUSE
-            TvCommand.STOP -> "input keyevent 86"           // KEYCODE_MEDIA_STOP
-            TvCommand.REWIND -> "input keyevent 89"         // KEYCODE_MEDIA_REWIND
-            TvCommand.FORWARD -> "input keyevent 90"        // KEYCODE_MEDIA_FAST_FORWARD
-            TvCommand.NEXT -> "input keyevent 87"           // KEYCODE_MEDIA_NEXT
-            TvCommand.PREVIOUS -> "input keyevent 88"       // KEYCODE_MEDIA_PREVIOUS
+            TvCommand.PLAY -> "input keyevent 126"
+            TvCommand.PAUSE -> "input keyevent 127"
+            TvCommand.PLAY_PAUSE -> "input keyevent 85"
+            TvCommand.STOP -> "input keyevent 86"
+            TvCommand.REWIND -> "input keyevent 89"
+            TvCommand.FORWARD -> "input keyevent 90"
+            TvCommand.NEXT -> "input keyevent 87"
+            TvCommand.PREVIOUS -> "input keyevent 88"
 
             // ============ VOLUME ============
-            TvCommand.VOLUME_UP -> "input keyevent 24"      // KEYCODE_VOLUME_UP
-            TvCommand.VOLUME_DOWN -> "input keyevent 25"    // KEYCODE_VOLUME_DOWN
-            TvCommand.VOLUME_MUTE -> "input keyevent 164"   // KEYCODE_VOLUME_MUTE
+            TvCommand.VOLUME_UP -> "input keyevent 24"
+            TvCommand.VOLUME_DOWN -> "input keyevent 25"
+            TvCommand.VOLUME_MUTE -> "input keyevent 164"
 
             // ============ CHANNEL ============
-            TvCommand.CHANNEL_UP -> "input keyevent 166"    // KEYCODE_CHANNEL_UP
-            TvCommand.CHANNEL_DOWN -> "input keyevent 167"  // KEYCODE_CHANNEL_DOWN
+            TvCommand.CHANNEL_UP -> "input keyevent 166"
+            TvCommand.CHANNEL_DOWN -> "input keyevent 167"
 
-            // ============ TEXT INPUT ============
+            // ============ TEXT ============
             TvCommand.INPUT_TEXT -> {
                 if (payload.isBlank()) null
                 else "input text '${escapeShell(payload)}'"
             }
-            TvCommand.KEY_DELETE -> "input keyevent 67"     // KEYCODE_DEL
-            TvCommand.KEY_ENTER -> "input keyevent 66"      // KEYCODE_ENTER
+            TvCommand.KEY_DELETE -> "input keyevent 67"
+            TvCommand.KEY_ENTER -> "input keyevent 66"
 
             // ============ NUMBER ============
             TvCommand.NUM_0 -> "input keyevent 7"
@@ -113,23 +186,23 @@ class AdbTvClient(private val context: Context) : TvProtocol {
             TvCommand.NUM_9 -> "input keyevent 16"
 
             // ============ COLOR ============
-            TvCommand.COLOR_RED -> "input keyevent 183"     // KEYCODE_PROG_RED
-            TvCommand.COLOR_GREEN -> "input keyevent 184"   // KEYCODE_PROG_GREEN
-            TvCommand.COLOR_YELLOW -> "input keyevent 185"  // KEYCODE_PROG_YELLOW
-            TvCommand.COLOR_BLUE -> "input keyevent 186"    // KEYCODE_PROG_BLUE
+            TvCommand.COLOR_RED -> "input keyevent 183"
+            TvCommand.COLOR_GREEN -> "input keyevent 184"
+            TvCommand.COLOR_YELLOW -> "input keyevent 185"
+            TvCommand.COLOR_BLUE -> "input keyevent 186"
 
             // ============ INPUT SOURCE ============
-            TvCommand.INPUT_HDMI1 -> "input keyevent 243"   // KEYCODE_TV_INPUT_HDMI_1
+            TvCommand.INPUT_HDMI1 -> "input keyevent 243"
             TvCommand.INPUT_HDMI2 -> "input keyevent 244"
             TvCommand.INPUT_HDMI3 -> "input keyevent 245"
             TvCommand.INPUT_HDMI4 -> "input keyevent 246"
             TvCommand.INPUT_AV1 -> "input keyevent 247"
             TvCommand.INPUT_AV2 -> "input keyevent 248"
-            TvCommand.INPUT_TV -> "input keyevent 170"      // KEYCODE_TV
+            TvCommand.INPUT_TV -> "input keyevent 170"
 
             // ============ VOICE ============
-            TvCommand.VOICE_START -> "input keyevent 219"   // KEYCODE_VOICE_ASSIST
-            TvCommand.VOICE_STOP -> "input keyevent 4"      // back
+            TvCommand.VOICE_START -> "input keyevent 219"
+            TvCommand.VOICE_STOP -> "input keyevent 4"
 
             // ============ CUSTOM ============
             TvCommand.LAUNCH_APP -> {
@@ -141,15 +214,14 @@ class AdbTvClient(private val context: Context) : TvProtocol {
         }
     }
 
-    /**
-     * Escape shell command (single quotes).
-     */
     private fun escapeShell(input: String): String {
         return input.replace("'", "'\\''")
     }
 
-    /**
-     * Cek status koneksi via ping.
-     */
     suspend fun checkConnection(): Boolean = adbClient.ping()
+
+    fun clearPairing(host: String? = null) {
+        AdbPairing.clearPairing(context, host)
+        needsPairing = false
+    }
 }
