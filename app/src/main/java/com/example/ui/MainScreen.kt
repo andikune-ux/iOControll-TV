@@ -79,6 +79,7 @@ import dev.andikuneiocontroll.ui.filemanager.RenameDialog
 import dev.andikuneiocontroll.ui.filemanager.WifiShareDialog
 import dev.andikuneiocontroll.ui.permissions.PermissionHandlerView
 import dev.andikuneiocontroll.ui.remote.RemoteTvDialog
+import dev.andikuneiocontroll.ui.remote.dialogs.AdbPairingDialog
 import dev.andikuneiocontroll.ui.remote.dialogs.InfoTvDialog
 import dev.andikuneiocontroll.ui.remote.dialogs.InputSourceDialog
 import dev.andikuneiocontroll.ui.remote.dialogs.ManualIpDialog
@@ -160,6 +161,7 @@ fun MainScreen(viewModel: MainViewModel) {
     var showTvPickerDialog by remember { mutableStateOf(false) }
     var showManualIpDialog by remember { mutableStateOf(false) }
     var showPairingDialog by remember { mutableStateOf(false) }
+    var showAdbPairingDialog by remember { mutableStateOf(false) }
     var showInfoTvDialog by remember { mutableStateOf(false) }
     var showInputSourceDialog by remember { mutableStateOf(false) }
     var showShortcutDialog by remember { mutableStateOf(false) }
@@ -170,6 +172,10 @@ fun MainScreen(viewModel: MainViewModel) {
     var pairingError by remember { mutableStateOf("") }
     var isPairingSubmitting by remember { mutableStateOf(false) }
 
+    var adbPairingHost by remember { mutableStateOf("") }
+    var adbPairingError by remember { mutableStateOf("") }
+    var isAdbPairingSubmitting by remember { mutableStateOf(false) }
+
     val pane1SelectedCount = remember(pane1Items) { pane1Items.count { it.isSelected } }
     val pane2SelectedCount = remember(pane2Items) { pane2Items.count { it.isSelected } }
     val anySelected = pane1SelectedCount > 0 || pane2SelectedCount > 0
@@ -178,6 +184,39 @@ fun MainScreen(viewModel: MainViewModel) {
     LaunchedEffect(showTvPickerDialog) {
         if (showTvPickerDialog) {
             viewModel.scanTvs()
+        }
+    }
+
+    // Helper: connect ke TV dengan handle PAIRING_NEEDED
+    val connectToTvWithPairingCheck: (DiscoveredTv) -> Unit = { tv ->
+        pairingTvName = tv.displayName
+        pairingTv = tv
+        isPairingSubmitting = true
+        viewModel.connectToTv(tv, "") { success, message ->
+            isPairingSubmitting = false
+            if (success) {
+                showTvPickerDialog = false
+                showManualIpDialog = false
+                showPairingDialog = false
+                showAdbPairingDialog = false
+                showRemoteDialog = true
+                Toast.makeText(context, message, Toast.LENGTH_SHORT).show()
+            } else if (message.contains("PAIRING_NEEDED", ignoreCase = true)) {
+                // Butuh ADB pairing
+                showTvPickerDialog = false
+                showManualIpDialog = false
+                adbPairingHost = tv.ip
+                adbPairingError = ""
+                showAdbPairingDialog = true
+            } else if (message.contains("PIN", ignoreCase = true)) {
+                // Butuh PIN (Android TV Remote v2 / Samsung / LG)
+                showTvPickerDialog = false
+                showManualIpDialog = false
+                showPairingDialog = true
+            } else {
+                // Error lain
+                Toast.makeText(context, message, Toast.LENGTH_LONG).show()
+            }
         }
     }
 
@@ -464,21 +503,7 @@ fun MainScreen(viewModel: MainViewModel) {
             savedTvs = savedTvs,
             isScanning = isScanningTv,
             onRefresh = { viewModel.scanTvs() },
-            onSelectDiscovered = { tv ->
-                showTvPickerDialog = false
-                pairingTvName = tv.displayName
-                pairingTv = tv
-                isPairingSubmitting = true
-                viewModel.connectToTv(tv, "") { success, message ->
-                    isPairingSubmitting = false
-                    if (success) {
-                        showRemoteDialog = true
-                        Toast.makeText(context, message, Toast.LENGTH_SHORT).show()
-                    } else {
-                        showPairingDialog = true
-                    }
-                }
-            },
+            onSelectDiscovered = { tv -> connectToTvWithPairingCheck(tv) },
             onSelectSaved = { tv ->
                 showTvPickerDialog = false
                 pairingTvName = tv.displayName
@@ -498,7 +523,13 @@ fun MainScreen(viewModel: MainViewModel) {
                             protocol = tv.protocol
                         )
                         pairingTv = discovered
-                        showPairingDialog = true
+                        if (message.contains("PAIRING_NEEDED", ignoreCase = true)) {
+                            adbPairingHost = tv.ipAddress
+                            adbPairingError = ""
+                            showAdbPairingDialog = true
+                        } else {
+                            showPairingDialog = true
+                        }
                     }
                 }
             },
@@ -523,20 +554,40 @@ fun MainScreen(viewModel: MainViewModel) {
                     brand = "ANDROID_TV",
                     protocol = "ANDROID_TV_V2"
                 )
-                pairingTvName = manualTv.displayName
-                pairingTv = manualTv
-                isPairingSubmitting = true
-                viewModel.connectToTv(manualTv, "") { success, message ->
-                    isPairingSubmitting = false
+                connectToTvWithPairingCheck(manualTv)
+            },
+            onDismiss = { showManualIpDialog = false }
+        )
+    }
+
+    if (showAdbPairingDialog) {
+        AdbPairingDialog(
+            tvName = pairingTvName,
+            defaultHost = adbPairingHost,
+            isSubmitting = isAdbPairingSubmitting,
+            errorMessage = adbPairingError,
+            onPair = { host, port, code ->
+                isAdbPairingSubmitting = true
+                adbPairingError = ""
+                kotlinx.coroutines.MainScope().launch {
+                    val (success, message) = viewModel.remoteController.pair(host, port, code)
+                    isAdbPairingSubmitting = false
                     if (success) {
-                        showRemoteDialog = true
-                        Toast.makeText(context, message, Toast.LENGTH_SHORT).show()
+                        showAdbPairingDialog = false
+                        // Auto-connect setelah pairing sukses
+                        val tv = pairingTv
+                        if (tv != null) {
+                            connectToTvWithPairingCheck(tv)
+                        }
                     } else {
-                        showPairingDialog = true
+                        adbPairingError = message
                     }
                 }
             },
-            onDismiss = { showManualIpDialog = false }
+            onCancel = {
+                showAdbPairingDialog = false
+                adbPairingError = ""
+            }
         )
     }
 
@@ -871,5 +922,3 @@ fun StabiloLauncherDialog(
         }
     }
 }
-
-
