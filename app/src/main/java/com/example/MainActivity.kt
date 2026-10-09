@@ -57,14 +57,6 @@ private sealed interface AppState {
     data object Main : AppState
 }
 
-/**
- * AppRoot — root composable yang menampilkan:
- * 1. Crash dialog (kalau ada crash sebelumnya)
- * 2. Flow: Splash → Onboarding → Main
- *
- * CRASH DIALOG: ditampilkan paling atas (overlay), tidak bisa dismiss
- * kecuali user tap tombol Salin/Hapus/Tutup.
- */
 @Composable
 private fun AppRoot(viewModel: MainViewModel) {
     val context = LocalContext.current
@@ -80,9 +72,11 @@ private fun AppRoot(viewModel: MainViewModel) {
     var crashFile by remember { mutableStateOf<File?>(null) }
     var showCrashDialog by remember { mutableStateOf(false) }
 
+    // Flag: tunggu crash dialog ditutup dulu sebelum MainViewModel init
+    var crashDialogResolved by remember { mutableStateOf(false) }
+
     // Cek crash log SEKALI saat app dibuka
     LaunchedEffect(Unit) {
-        // 1. Cek crash log DULU (biar langsung muncul)
         try {
             val file = CrashHandler.getLatestCrashFile(context)
             if (file != null && file.exists()) {
@@ -94,27 +88,34 @@ private fun AppRoot(viewModel: MainViewModel) {
                 crashFileName = file.name
                 crashFile = file
                 showCrashDialog = true
+            } else {
+                // Tidak ada crash → langsung lanjut
+                crashDialogResolved = true
             }
         } catch (e: Exception) {
-            e.printStackTrace()
+            crashDialogResolved = true
         }
 
-        // 2. Cek onboarding
         onboardingDone = prefs.getOnboardingDoneOnce()
     }
 
     // ==============================
-    // FLOW UTAMA
+    // FLOW UTAMA — hanya render kalau crash dialog sudah resolved
     // ==============================
     when (currentState) {
         AppState.Splash -> {
             SplashScreen(
                 onFinished = {
                     scope.launch {
-                        val autoConnect = prefs.getAutoConnectOnce()
-                        if (autoConnect) {
-                            viewModel.autoConnectLastTv()
+                        try {
+                            val autoConnect = prefs.getAutoConnectOnce()
+                            if (autoConnect) {
+                                viewModel.autoConnectLastTv()
+                            }
+                        } catch (e: Exception) {
+                            e.printStackTrace()
                         }
+
                         currentState = when {
                             onboardingDone == true -> AppState.Main
                             onboardingDone == false -> AppState.Onboarding
@@ -142,7 +143,6 @@ private fun AppRoot(viewModel: MainViewModel) {
     // ==============================
     // CRASH DIALOG — OVERLAY PALING ATAS
     // ==============================
-    // Ditampilkan SETELAH frame lain render, tidak akan hilang karena recompose.
     if (showCrashDialog) {
         CrashLogDialog(
             crashContent = crashContent,
@@ -155,11 +155,11 @@ private fun AppRoot(viewModel: MainViewModel) {
                 }
                 showCrashDialog = false
                 crashFile = null
+                crashDialogResolved = true
             },
             onDismiss = {
-                // Tutup dialog, tapi JANGAN hapus file
-                // Biar user bisa lihat lagi kalau restart
                 showCrashDialog = false
+                crashDialogResolved = true
             }
         )
     }
