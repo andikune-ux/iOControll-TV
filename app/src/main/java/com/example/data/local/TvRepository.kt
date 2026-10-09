@@ -2,12 +2,7 @@ package dev.andikuneiocontroll.data.local
 
 import android.content.Context
 import kotlinx.coroutines.flow.Flow
-import kotlinx.coroutines.flow.map
 
-/**
- * Repository — wrapper untuk akses TvDatabase.
- * Mengubah TvEntity <-> model domain (kalau perlu).
- */
 class TvRepository(context: Context) {
 
     private val dao = TvDatabase.getInstance(context).tvDao()
@@ -65,14 +60,9 @@ class TvRepository(context: Context) {
     }
 
     // ==========================================
-    // HELPER — Simpan / Update dari hasil discovery
+    // HELPER — Save/Update dari discovery
     // ==========================================
 
-    /**
-     * Simpan TV dari hasil discovery.
-     * Kalau deviceId sudah ada, update info IP/port/name.
-     * Kalau belum ada, insert baru.
-     */
     suspend fun saveOrUpdateFromDiscovery(
         deviceId: String,
         originalName: String,
@@ -80,24 +70,24 @@ class TvRepository(context: Context) {
         port: Int,
         brand: String,
         protocol: String,
-        modelName: String = ""
+        modelName: String = "",
+        hasChromecast: Boolean = false
     ): TvEntity {
         val existing = dao.getTvByDeviceId(deviceId)
 
         return if (existing != null) {
-            // Update info yang berubah (IP bisa berubah)
             val updated = existing.copy(
                 originalName = originalName.ifBlank { existing.originalName },
                 ipAddress = ipAddress,
                 port = port,
                 brand = brand,
                 protocol = protocol,
-                modelName = modelName.ifBlank { existing.modelName }
+                modelName = modelName.ifBlank { existing.modelName },
+                hasChromecast = hasChromecast || existing.hasChromecast
             )
             dao.updateTv(updated)
             updated
         } else {
-            // Insert baru
             val newTv = TvEntity(
                 id = generateId(deviceId),
                 deviceId = deviceId,
@@ -107,6 +97,7 @@ class TvRepository(context: Context) {
                 brand = brand,
                 protocol = protocol,
                 modelName = modelName,
+                hasChromecast = hasChromecast,
                 isPaired = false,
                 lastConnected = 0L
             )
@@ -115,16 +106,9 @@ class TvRepository(context: Context) {
         }
     }
 
-    /**
-     * Auto-connect ke TV terakhir yang connect.
-     */
     suspend fun getAutoConnectTv(): TvEntity? {
         return dao.getLastConnectedTv()
     }
-
-    // ==========================================
-    // UTIL
-    // ==========================================
 
     private fun generateId(deviceId: String): String {
         return "tv_${deviceId.hashCode().toString(16)}"
