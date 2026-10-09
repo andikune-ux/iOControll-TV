@@ -208,6 +208,38 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             remoteController.disconnect()
         }
     }
+    /**
+ * Auto-connect ke TV terakhir yang tersimpan di database.
+ * Dipanggil dari Splash Screen kalau fitur Auto-Connect aktif.
+ */
+fun autoConnectLastTv() {
+    viewModelScope.launch {
+        try {
+            val lastTv = tvRepository.getAutoConnectTv()
+            if (lastTv != null) {
+                val discovered = DiscoveredTv(
+                    deviceId = lastTv.deviceId,
+                    name = lastTv.displayName,
+                    ip = lastTv.ipAddress,
+                    port = lastTv.port,
+                    brand = lastTv.brand,
+                    protocol = lastTv.protocol,
+                    modelName = lastTv.modelName
+                )
+                remoteController.connect(discovered, "") { success, _ ->
+                    if (success) {
+                        // Update timestamp lastConnected
+                        viewModelScope.launch {
+                            tvRepository.updateLastConnected(lastTv.id)
+                        }
+                    }
+                }
+            }
+        } catch (e: Exception) {
+            e.printStackTrace()
+        }
+    }
+}
 
     /** Hapus TV dari Room. */
     fun forgetTv(tv: TvEntity) {
