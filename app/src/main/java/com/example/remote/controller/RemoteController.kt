@@ -114,7 +114,8 @@ class RemoteController(context: Context) {
             if (adbProtocol == null) {
                 return false to "Protokol ADB tidak tersedia"
             }
-            adbProtocol.pair(host, pairingPort, pairingCode)
+            adbProtocol.pair(host, pairingPort, pairingCode) 
+    ?: (false to "Pairing tidak didukung protokol ini")
         } catch (e: Exception) {
             e.printStackTrace()
             false to "Error pairing: ${e.message ?: "Unknown"}"
