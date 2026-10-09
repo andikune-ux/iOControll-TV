@@ -8,10 +8,10 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -21,6 +21,8 @@ import androidx.compose.material.icons.filled.ContentCopy
 import androidx.compose.material.icons.filled.GridView
 import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.Keyboard
+import androidx.compose.material.icons.filled.KeyboardArrowDown
+import androidx.compose.material.icons.filled.KeyboardArrowUp
 import androidx.compose.material.icons.filled.Mic
 import androidx.compose.material.icons.filled.Mouse
 import androidx.compose.material.icons.filled.Pause
@@ -50,13 +52,11 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import dev.andikuneiocontroll.ui.theme.DarkBgCard
 import dev.andikuneiocontroll.ui.theme.DarkBgCardElevated
 import dev.andikuneiocontroll.ui.theme.StabiloCyan
 import dev.andikuneiocontroll.ui.theme.StabiloLime
 import dev.andikuneiocontroll.ui.theme.StabiloPink
 import dev.andikuneiocontroll.ui.theme.StabiloYellow
-import dev.andikuneiocontroll.ui.theme.TextPrimary
 import dev.andikuneiocontroll.ui.theme.TextSecondary
 
 // ==========================================================
@@ -137,7 +137,7 @@ fun RemoteMediaBar(
 }
 
 // ==========================================================
-// 4. VOLUME BAR (2 tombol terpisah + gesture)
+// 4. VOLUME BAR
 // ==========================================================
 @Composable
 fun RemoteVolumeBar(
@@ -160,7 +160,6 @@ fun RemoteVolumeBar(
     ) {
         // Volume rocker (2 tombol vertikal)
         Column(horizontalAlignment = Alignment.CenterHorizontally) {
-            // Vol+
             Box(
                 modifier = Modifier
                     .size(54.dp)
@@ -179,9 +178,8 @@ fun RemoteVolumeBar(
                 Icon(Icons.Default.VolumeUp, "Vol +", tint = StabiloLime, modifier = Modifier.size(24.dp))
             }
 
-            Box(modifier = Modifier.size(6.dp))
+            Spacer(modifier = Modifier.size(6.dp))
 
-            // Vol-
             Box(
                 modifier = Modifier
                     .size(54.dp)
@@ -200,11 +198,11 @@ fun RemoteVolumeBar(
                 Icon(Icons.Default.VolumeDown, "Vol -", tint = StabiloLime, modifier = Modifier.size(24.dp))
             }
 
-            androidx.compose.foundation.layout.Spacer(modifier = Modifier.size(4.dp))
+            Spacer(modifier = Modifier.size(4.dp))
             Text("Volume", color = TextSecondary, fontSize = 10.sp)
         }
 
-        // Channel rocker (2 tombol vertikal)
+        // Channel rocker
         Column(horizontalAlignment = Alignment.CenterHorizontally) {
             Box(
                 modifier = Modifier
@@ -224,7 +222,7 @@ fun RemoteVolumeBar(
                 Icon(Icons.Default.KeyboardArrowUp, "CH +", tint = StabiloCyan, modifier = Modifier.size(24.dp))
             }
 
-            Box(modifier = Modifier.size(6.dp))
+            Spacer(modifier = Modifier.size(6.dp))
 
             Box(
                 modifier = Modifier
@@ -244,14 +242,14 @@ fun RemoteVolumeBar(
                 Icon(Icons.Default.KeyboardArrowDown, "CH -", tint = StabiloCyan, modifier = Modifier.size(24.dp))
             }
 
-            androidx.compose.foundation.layout.Spacer(modifier = Modifier.size(4.dp))
+            Spacer(modifier = Modifier.size(4.dp))
             Text("Channel", color = TextSecondary, fontSize = 10.sp)
         }
     }
 }
 
 // ==========================================================
-// 5. QUICK BAR — switcher mode
+// 5. QUICK BAR
 // ==========================================================
 @Composable
 fun RemoteQuickBar(
@@ -272,23 +270,8 @@ fun RemoteQuickBar(
         ModeButton(RemoteMode.GESTURE, activeMode, onModeChanged, Icons.Default.ScreenRotation, "Gest", StabiloYellow)
         ModeButton(RemoteMode.AIR_MOUSE, activeMode, onModeChanged, Icons.Default.Sensors, "Air", StabiloCyan)
 
-        // Shortcut
-        RemoteSquareButton(
-            icon = Icons.Default.Home,
-            label = "Shortcut",
-            accentColor = StabiloPink,
-            onClick = onShortcut,
-            hapticType = 1
-        )
-
-        // Exit
-        RemoteSquareButton(
-            icon = Icons.AutoMirrored.Filled.ArrowBack,
-            label = "Exit",
-            accentColor = StabiloPink,
-            onClick = onExit,
-            hapticType = 2
-        )
+        RemoteSquareButton(Icons.Default.Home, "Shortcut", StabiloPink, onShortcut, hapticType = 1)
+        RemoteSquareButton(Icons.AutoMirrored.Filled.ArrowBack, "Exit", StabiloPink, onExit, hapticType = 2)
     }
 }
 
@@ -331,7 +314,7 @@ private fun ModeButton(
                 modifier = Modifier.size(20.dp)
             )
         }
-        androidx.compose.foundation.layout.Spacer(modifier = Modifier.size(3.dp))
+        Spacer(modifier = Modifier.size(3.dp))
         Text(
             text = label,
             color = if (isActive) accentColor else TextSecondary,
@@ -341,9 +324,6 @@ private fun ModeButton(
     }
 }
 
-/**
- * Enum mode remote.
- */
 enum class RemoteMode(val label: String) {
     DPAD("D-Pad"),
     GRID("Grid"),
