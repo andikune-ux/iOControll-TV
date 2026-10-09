@@ -35,7 +35,6 @@ import androidx.compose.material.icons.filled.FullscreenExit
 import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.PieChart
 import androidx.compose.material.icons.filled.Settings
-import androidx.compose.material.icons.filled.SettingsRemote
 import androidx.compose.material.icons.filled.Wifi
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
@@ -67,8 +66,10 @@ import dev.andikuneiocontroll.filemanager.FileManagerHelper
 import dev.andikuneiocontroll.model.ActiveViewer
 import dev.andikuneiocontroll.model.FileItem
 import dev.andikuneiocontroll.ui.components.MobileModeView
+import dev.andikuneiocontroll.ui.components.RainbowRemoteIcon
 import dev.andikuneiocontroll.ui.components.RemoteTvDialog
 import dev.andikuneiocontroll.ui.components.SettingsDialog
+import dev.andikuneiocontroll.ui.components.StabiloTooltipButton
 import dev.andikuneiocontroll.ui.filemanager.BatchRenameDialog
 import dev.andikuneiocontroll.ui.filemanager.FileContextMenuDialog
 import dev.andikuneiocontroll.ui.filemanager.FilePaneView
@@ -93,7 +94,6 @@ import dev.andikuneiocontroll.viewers.ImageViewerDialog
 import dev.andikuneiocontroll.viewers.TextViewerDialog
 import dev.andikuneiocontroll.viewers.VaultDialog
 import dev.andikuneiocontroll.viewers.VideoPlayerDialog
-
 @Composable
 fun MainScreen(viewModel: MainViewModel) {
     val context = LocalContext.current
@@ -147,253 +147,232 @@ fun MainScreen(viewModel: MainViewModel) {
     val pane2SelectedCount = remember(pane2Items) { pane2Items.count { it.isSelected } }
     val anySelected = pane1SelectedCount > 0 || pane2SelectedCount > 0
     val isServerRunning = serverConfig.isRunning
-
     Scaffold(
-        modifier = Modifier.fillMaxSize(),
-        containerColor = DarkBgPrimary,
-        bottomBar = {
-            if (anySelected) {
-                val isPane1 = pane1SelectedCount > 0
-                StabiloMultiSelectionBar(
-                    selectedCount = if (isPane1) pane1SelectedCount else pane2SelectedCount,
-                    onCopy = { viewModel.copyToOppositePane(fromPane1 = isPane1, isMove = false) },
-                    onMove = { viewModel.copyToOppositePane(fromPane1 = isPane1, isMove = true) },
-                    onWifiShare = { viewModel.shareSelectedOverWifi(fromPane1 = isPane1) },
-                    onCompress = { viewModel.compressSelected(fromPane1 = isPane1) },
-                    onVault = { viewModel.setViewer(ActiveViewer.Vault) },
-                    onDelete = { viewModel.deleteSelected(fromPane1 = isPane1) },
-                    onBatchRename = { showBatchRenameDialog = true },
-                    onClear = {
-                        if (isPane1) viewModel.clearSelectPane1() else viewModel.clearSelectPane2()
-                    }
-                )
-            }
+    modifier = Modifier.fillMaxSize(),
+    containerColor = DarkBgPrimary,
+    bottomBar = {
+        if (anySelected) {
+            val isPane1 = pane1SelectedCount > 0
+            StabiloMultiSelectionBar(
+                selectedCount = if (isPane1) pane1SelectedCount else pane2SelectedCount,
+                onCopy = { viewModel.copyToOppositePane(fromPane1 = isPane1, isMove = false) },
+                onMove = { viewModel.copyToOppositePane(fromPane1 = isPane1, isMove = true) },
+                onWifiShare = { viewModel.shareSelectedOverWifi(fromPane1 = isPane1) },
+                onCompress = { viewModel.compressSelected(fromPane1 = isPane1) },
+                onVault = { viewModel.setViewer(ActiveViewer.Vault) },
+                onDelete = { viewModel.deleteSelected(fromPane1 = isPane1) },
+                onBatchRename = { showBatchRenameDialog = true },
+                onClear = {
+                    if (isPane1) viewModel.clearSelectPane1() else viewModel.clearSelectPane2()
+                }
+            )
         }
-    ) { innerPadding ->
-        Box(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(innerPadding)
-        ) {
-            if (isLandscape) {
-                // ============ MODE TV (LANDSCAPE) - 2 PANE ============
-                Box(modifier = Modifier.fillMaxSize()) {
-                    Row(modifier = Modifier.fillMaxSize()) {
-                        Box(modifier = Modifier.weight(1f)) {
-                            FilePaneView(
-                                paneTitle = "PANE KIRI • PENYIMPANAN INTERNAL",
-                                currentPath = pane1Path,
-                                items = pane1Items,
-                                selectedCount = pane1SelectedCount,
-                                onNavigate = { viewModel.loadPane1(it) },
-                                onNavigateUp = { viewModel.navigateUpPane1() },
-                                onItemClick = { viewModel.openFile(it) },
-                                onItemLongClick = { contextMenuItem = it },
-                                onToggleSelect = { viewModel.toggleSelectPane1(it) },
-                                onSelectAll = { viewModel.selectAllPane1() },
-                                onClearSelection = { viewModel.clearSelectPane1() },
-                                onSwitchStorage = { label ->
-                                    when (label) {
-                                        "Penyimpanan Internal" -> viewModel.loadPane1(FileManagerHelper.getDefaultStoragePath())
-                                        "Aplikasi (APK)" -> viewModel.loadPane1("APPLICATIONS")
-                                        else -> viewModel.setViewer(ActiveViewer.Vault)
-                                    }
-                                },
-                                modifier = Modifier.fillMaxSize()
-                            )
-                        }
-
-                        // Toolbar Tengah
-                        Column(
-                            modifier = Modifier
-                                .width(60.dp)
-                                .fillMaxHeight()
-                                .background(DarkBgCard)
-                                .border(width = 1.dp, color = DarkDivider),
-                            horizontalAlignment = Alignment.CenterHorizontally,
-                            verticalArrangement = Arrangement.SpaceBetween
-                        ) {
-                            IconButton(
-                                onClick = { showSettingsDialog = true },
-                                modifier = Modifier.padding(top = 12.dp)
-                            ) {
-                                Icon(
-                                    Icons.Default.Settings,
-                                    contentDescription = "Pengaturan",
-                                    tint = StabiloCyan,
-                                    modifier = Modifier.size(26.dp)
-                                )
-                            }
-
-                            Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                                IconButton(onClick = { viewModel.remoteClient.sendCommand("DPAD_RIGHT") }) {
-                                    Icon(
-                                        Icons.AutoMirrored.Filled.ArrowForward,
-                                        contentDescription = "D-Pad",
-                                        tint = StabiloLime,
-                                        modifier = Modifier.size(26.dp)
-                                    )
+    }
+) { innerPadding ->
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .padding(innerPadding)
+    ) {
+        if (isLandscape) {
+            // ============ MODE TV (LANDSCAPE) - 2 PANE ============
+            Box(modifier = Modifier.fillMaxSize()) {
+                Row(modifier = Modifier.fillMaxSize()) {
+                    Box(modifier = Modifier.weight(1f)) {
+                        FilePaneView(
+                            paneTitle = "PANE KIRI • PENYIMPANAN INTERNAL",
+                            currentPath = pane1Path,
+                            items = pane1Items,
+                            selectedCount = pane1SelectedCount,
+                            onNavigate = { viewModel.loadPane1(it) },
+                            onNavigateUp = { viewModel.navigateUpPane1() },
+                            onItemClick = { viewModel.openFile(it) },
+                            onItemLongClick = { contextMenuItem = it },
+                            onToggleSelect = { viewModel.toggleSelectPane1(it) },
+                            onSelectAll = { viewModel.selectAllPane1() },
+                            onClearSelection = { viewModel.clearSelectPane1() },
+                            onSwitchStorage = { label ->
+                                when (label) {
+                                    "Penyimpanan Internal" -> viewModel.loadPane1(FileManagerHelper.getDefaultStoragePath())
+                                    "Aplikasi (APK)" -> viewModel.loadPane1("APPLICATIONS")
+                                    else -> viewModel.setViewer(ActiveViewer.Vault)
                                 }
-                                Spacer(modifier = Modifier.height(12.dp))
+                            },
+                            modifier = Modifier.fillMaxSize()
+                        )
+                    }
 
-                                IconButton(onClick = {
+                    Column(
+                        modifier = Modifier
+                            .width(60.dp)
+                            .fillMaxHeight()
+                            .background(DarkBgCard)
+                            .border(width = 1.dp, color = DarkDivider),
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        verticalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        StabiloTooltipButton(
+                            icon = Icons.Default.Settings,
+                            tooltip = "Pengaturan",
+                            tint = StabiloCyan,
+                            onClick = { showSettingsDialog = true },
+                            modifier = Modifier.padding(top = 12.dp),
+                            buttonSize = 42.dp,
+                            iconSize = 26.dp
+                        )
+
+                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                            StabiloTooltipButton(
+                                icon = Icons.AutoMirrored.Filled.ArrowForward,
+                                tooltip = "D-Pad Kanan",
+                                tint = StabiloLime,
+                                onClick = { viewModel.remoteClient.sendCommand("DPAD_RIGHT") },
+                                buttonSize = 42.dp,
+                                iconSize = 26.dp
+                            )
+
+                            Spacer(modifier = Modifier.height(12.dp))
+
+                            StabiloTooltipButton(
+                                icon = Icons.Default.FullscreenExit,
+                                tooltip = "Mode HP",
+                                tint = StabiloYellow,
+                                onClick = {
                                     activity?.requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_PORTRAIT
                                     Toast.makeText(context, "Beralih ke Mode HP (Portrait)", Toast.LENGTH_SHORT).show()
-                                }) {
-                                    Icon(
-                                        Icons.Default.FullscreenExit,
-                                        contentDescription = "Ke Portrait",
-                                        tint = StabiloYellow,
-                                        modifier = Modifier.size(26.dp)
-                                    )
-                                }
-                                Spacer(modifier = Modifier.height(12.dp))
-
-                                // Dot -> BUKA SERVER WIFI
-                                Box(
-                                    modifier = Modifier
-                                        .size(38.dp)
-                                        .clip(CircleShape)
-                                        .background(DarkBgCardElevated)
-                                        .border(
-                                            1.5.dp,
-                                            if (isServerRunning) Color(0xFF22C55E).copy(alpha = 0.7f) else StabiloLime.copy(alpha = 0.5f),
-                                            CircleShape
-                                        )
-                                        .clickable { viewModel.setShowWifiShareDialog(true) },
-                                    contentAlignment = Alignment.Center
-                                ) {
-                                    Icon(
-                                        Icons.Default.Wifi,
-                                        contentDescription = "Server WiFi",
-                                        tint = if (isServerRunning) Color(0xFF22C55E) else StabiloLime,
-                                        modifier = Modifier.size(18.dp)
-                                    )
-                                }
-                            }
-
-                            IconButton(
-                                onClick = { showRemoteDialog = true },
-                                modifier = Modifier.padding(bottom = 14.dp)
-                            ) {
-                                Icon(
-                                    Icons.Default.SettingsRemote,
-                                    contentDescription = "Remote TV",
-                                    tint = StabiloPink,
-                                    modifier = Modifier.size(26.dp)
-                                )
-                            }
-                        }
-
-                        Box(modifier = Modifier.weight(1f)) {
-                            FilePaneView(
-                                paneTitle = "PANE KANAN • PENYIMPANAN INTERNAL",
-                                currentPath = pane2Path,
-                                items = pane2Items,
-                                selectedCount = pane2SelectedCount,
-                                onNavigate = { viewModel.loadPane2(it) },
-                                onNavigateUp = { viewModel.navigateUpPane2() },
-                                onItemClick = { viewModel.openFile(it) },
-                                onItemLongClick = { contextMenuItem = it },
-                                onToggleSelect = { viewModel.toggleSelectPane2(it) },
-                                onSelectAll = { viewModel.selectAllPane2() },
-                                onClearSelection = { viewModel.clearSelectPane2() },
-                                onSwitchStorage = { label ->
-                                    when (label) {
-                                        "Penyimpanan Internal" -> viewModel.loadPane2(FileManagerHelper.getDefaultStoragePath())
-                                        "Aplikasi (APK)" -> viewModel.loadPane2("APPLICATIONS")
-                                        else -> viewModel.setViewer(ActiveViewer.Vault)
-                                    }
                                 },
-                                modifier = Modifier.fillMaxSize()
+                                buttonSize = 42.dp,
+                                iconSize = 26.dp
+                            )
+
+                            Spacer(modifier = Modifier.height(12.dp))
+
+                            StabiloTooltipButton(
+                                icon = Icons.Default.Wifi,
+                                tooltip = "Server WiFi",
+                                tint = if (isServerRunning) Color(0xFF22C55E) else StabiloLime,
+                                onClick = { viewModel.setShowWifiShareDialog(true) },
+                                buttonSize = 40.dp,
+                                iconSize = 20.dp
                             )
                         }
+
+                        RainbowRemoteIcon(
+                            onClick = { showRemoteDialog = true },
+                            modifier = Modifier.padding(bottom = 14.dp),
+                            buttonSize = 42.dp,
+                            iconSize = 26.dp,
+                            tooltip = "Remote TV"
+                        )
                     }
 
-                    Box(modifier = Modifier.align(Alignment.TopEnd).padding(16.dp)) {
-                        Surface(
-                            shape = CircleShape,
-                            color = DarkBgCardElevated,
-                            border = BorderStroke(1.5.dp, StabiloLime),
-                            shadowElevation = 8.dp,
-                            modifier = Modifier
-                                .size(42.dp)
-                                .clip(CircleShape)
-                                .clickable { showLauncherOverlay = true }
-                        ) {
-                            Box(contentAlignment = Alignment.Center) {
-                                Icon(
-                                    Icons.Default.Apps,
-                                    contentDescription = "Launcher",
-                                    tint = StabiloLime,
-                                    modifier = Modifier.size(22.dp)
-                                )
-                            }
+                    Box(modifier = Modifier.weight(1f)) {
+                        FilePaneView(
+                            paneTitle = "PANE KANAN • PENYIMPANAN INTERNAL",
+                            currentPath = pane2Path,
+                            items = pane2Items,
+                            selectedCount = pane2SelectedCount,
+                            onNavigate = { viewModel.loadPane2(it) },
+                            onNavigateUp = { viewModel.navigateUpPane2() },
+                            onItemClick = { viewModel.openFile(it) },
+                            onItemLongClick = { contextMenuItem = it },
+                            onToggleSelect = { viewModel.toggleSelectPane2(it) },
+                            onSelectAll = { viewModel.selectAllPane2() },
+                            onClearSelection = { viewModel.clearSelectPane2() },
+                            onSwitchStorage = { label ->
+                                when (label) {
+                                    "Penyimpanan Internal" -> viewModel.loadPane2(FileManagerHelper.getDefaultStoragePath())
+                                    "Aplikasi (APK)" -> viewModel.loadPane2("APPLICATIONS")
+                                    else -> viewModel.setViewer(ActiveViewer.Vault)
+                                }
+                            },
+                            modifier = Modifier.fillMaxSize()
+                        )
+                    }
+                }
+
+                Box(modifier = Modifier.align(Alignment.TopEnd).padding(16.dp)) {
+                    Surface(
+                        shape = CircleShape,
+                        color = DarkBgCardElevated,
+                        border = BorderStroke(1.5.dp, StabiloLime),
+                        shadowElevation = 8.dp,
+                        modifier = Modifier
+                            .size(42.dp)
+                            .clip(CircleShape)
+                            .clickable { showLauncherOverlay = true }
+                    ) {
+                        Box(contentAlignment = Alignment.Center) {
+                            Icon(
+                                Icons.Default.Apps,
+                                contentDescription = "Launcher",
+                                tint = StabiloLime,
+                                modifier = Modifier.size(22.dp)
+                            )
                         }
                     }
                 }
-            } else {
-                // ============ MODE HP (PORTRAIT) ============
-                MobileModeView(
-                    isLeftPaneVisible = isLeftPaneVisible,
-                    onTogglePane = { isLeftPaneVisible = !isLeftPaneVisible },
-                    onOpenSettings = { showSettingsDialog = true },
-                    onOpenWifiServer = { viewModel.setShowWifiShareDialog(true) },
-                    onOpenRemote = { showRemoteDialog = true },
-                    isConnected = isServerRunning,
-                    paneContent = {
-                        if (isLeftPaneVisible) {
-                            FilePaneView(
-                                paneTitle = "PANE KIRI (MODE HP) • FILE MANAGER",
-                                currentPath = pane1Path,
-                                items = pane1Items,
-                                selectedCount = pane1SelectedCount,
-                                onNavigate = { viewModel.loadPane1(it) },
-                                onNavigateUp = { viewModel.navigateUpPane1() },
-                                onItemClick = { viewModel.openFile(it) },
-                                onItemLongClick = { contextMenuItem = it },
-                                onToggleSelect = { viewModel.toggleSelectPane1(it) },
-                                onSelectAll = { viewModel.selectAllPane1() },
-                                onClearSelection = { viewModel.clearSelectPane1() },
-                                onSwitchStorage = { label ->
-                                    when (label) {
-                                        "Penyimpanan Internal" -> viewModel.loadPane1(FileManagerHelper.getDefaultStoragePath())
-                                        "Aplikasi (APK)" -> viewModel.loadPane1("APPLICATIONS")
-                                        else -> viewModel.setViewer(ActiveViewer.Vault)
-                                    }
-                                },
-                                modifier = Modifier.fillMaxSize()
-                            )
-                        } else {
-                            FilePaneView(
-                                paneTitle = "PANE KANAN (MODE HP) • FILE MANAGER",
-                                currentPath = pane2Path,
-                                items = pane2Items,
-                                selectedCount = pane2SelectedCount,
-                                onNavigate = { viewModel.loadPane2(it) },
-                                onNavigateUp = { viewModel.navigateUpPane2() },
-                                onItemClick = { viewModel.openFile(it) },
-                                onItemLongClick = { contextMenuItem = it },
-                                onToggleSelect = { viewModel.toggleSelectPane2(it) },
-                                onSelectAll = { viewModel.selectAllPane2() },
-                                onClearSelection = { viewModel.clearSelectPane2() },
-                                onSwitchStorage = { label ->
-                                    when (label) {
-                                        "Penyimpanan Internal" -> viewModel.loadPane2(FileManagerHelper.getDefaultStoragePath())
-                                        "Aplikasi (APK)" -> viewModel.loadPane2("APPLICATIONS")
-                                        else -> viewModel.setViewer(ActiveViewer.Vault)
-                                    }
-                                },
-                                modifier = Modifier.fillMaxSize()
-                            )
-                        }
-                    }
-                )
             }
+        } else {
+            MobileModeView(
+                isLeftPaneVisible = isLeftPaneVisible,
+                onTogglePane = { isLeftPaneVisible = !isLeftPaneVisible },
+                onOpenSettings = { showSettingsDialog = true },
+                onOpenWifiServer = { viewModel.setShowWifiShareDialog(true) },
+                onOpenRemote = { showRemoteDialog = true },
+                isConnected = isServerRunning,
+                paneContent = {
+                    if (isLeftPaneVisible) {
+                        FilePaneView(
+                            paneTitle = "PANE KIRI (MODE HP) • FILE MANAGER",
+                            currentPath = pane1Path,
+                            items = pane1Items,
+                            selectedCount = pane1SelectedCount,
+                            onNavigate = { viewModel.loadPane1(it) },
+                            onNavigateUp = { viewModel.navigateUpPane1() },
+                            onItemClick = { viewModel.openFile(it) },
+                            onItemLongClick = { contextMenuItem = it },
+                            onToggleSelect = { viewModel.toggleSelectPane1(it) },
+                            onSelectAll = { viewModel.selectAllPane1() },
+                            onClearSelection = { viewModel.clearSelectPane1() },
+                            onSwitchStorage = { label ->
+                                when (label) {
+                                    "Penyimpanan Internal" -> viewModel.loadPane1(FileManagerHelper.getDefaultStoragePath())
+                                    "Aplikasi (APK)" -> viewModel.loadPane1("APPLICATIONS")
+                                    else -> viewModel.setViewer(ActiveViewer.Vault)
+                                }
+                            },
+                            modifier = Modifier.fillMaxSize()
+                        )
+                    } else {
+                        FilePaneView(
+                            paneTitle = "PANE KANAN (MODE HP) • FILE MANAGER",
+                            currentPath = pane2Path,
+                            items = pane2Items,
+                            selectedCount = pane2SelectedCount,
+                            onNavigate = { viewModel.loadPane2(it) },
+                            onNavigateUp = { viewModel.navigateUpPane2() },
+                            onItemClick = { viewModel.openFile(it) },
+                            onItemLongClick = { contextMenuItem = it },
+                            onToggleSelect = { viewModel.toggleSelectPane2(it) },
+                            onSelectAll = { viewModel.selectAllPane2() },
+                            onClearSelection = { viewModel.clearSelectPane2() },
+                            onSwitchStorage = { label ->
+                                when (label) {
+                                    "Penyimpanan Internal" -> viewModel.loadPane2(FileManagerHelper.getDefaultStoragePath())
+                                    "Aplikasi (APK)" -> viewModel.loadPane2("APPLICATIONS")
+                                    else -> viewModel.setViewer(ActiveViewer.Vault)
+                                }
+                            },
+                            modifier = Modifier.fillMaxSize()
+                        )
+                    }
+                }
+            )
         }
     }
-
-    // ============ OVERLAYS & DIALOGS ============
+    }
+        // ============ OVERLAYS & DIALOGS ============
 
     if (showSettingsDialog) {
         SettingsDialog(
@@ -484,7 +463,6 @@ fun MainScreen(viewModel: MainViewModel) {
         else -> {}
     }
 }
-
 @Composable
 fun ConnectionStatusDot(isConnected: Boolean, onClick: () -> Unit) {
     val dotColor = if (isConnected) Color(0xFF22C55E) else TextMuted
