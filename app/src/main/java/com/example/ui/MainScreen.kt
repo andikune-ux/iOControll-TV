@@ -518,13 +518,57 @@ fun MainScreen(viewModel: MainViewModel) {
 
     // === TV PICKER DIALOG ===
     if (showTvPickerDialog) {
-        TvPickerDialog(
-            discoveredTvs = discoveredTvs,
-            savedTvs = savedTvs,
-            isScanning = isScanningTv,
-            onRefresh = { viewModel.scanTvs() },
-            onSelectDiscovered = { tv ->
-                showTvPickerDialog = false
+    TvPickerDialog(
+        discoveredTvs = discoveredTvs,
+        savedTvs = savedTvs,
+        isScanning = isScanningTv,
+        onRefresh = { viewModel.scanTvs() },
+        onSelectDiscovered = { tv ->
+            showTvPickerDialog = false
+            pairingTvName = tv.displayName
+            pairingTv = tv
+            isPairingSubmitting = true
+            viewModel.connectToTv(tv, "") { success, message ->
+                isPairingSubmitting = false
+                if (success) {
+                    showRemoteDialog = true
+                    Toast.makeText(context, message, Toast.LENGTH_SHORT).show()
+                } else {
+                    showPairingDialog = true
+                }
+            }
+        },
+        onSelectSaved = { tv ->
+            showTvPickerDialog = false
+            pairingTvName = tv.displayName
+            isPairingSubmitting = true
+            viewModel.connectToSavedTv(tv) { success, message ->
+                isPairingSubmitting = false
+                if (success) {
+                    showRemoteDialog = true
+                    Toast.makeText(context, message, Toast.LENGTH_SHORT).show()
+                } else {
+                    val discovered = DiscoveredTv(
+                        deviceId = tv.deviceId,
+                        name = tv.displayName,
+                        ip = tv.ipAddress,
+                        port = tv.port,
+                        brand = tv.brand,
+                        protocol = tv.protocol
+                    )
+                    pairingTv = discovered
+                    showPairingDialog = true
+                }
+            }
+        },
+        onDeleteSaved = { tv -> viewModel.forgetTv(tv) },
+        onManualIp = {
+            showTvPickerDialog = false
+            showManualIpDialog = true
+        },
+        onDismiss = { showTvPickerDialog = false }
+    )
+}
                 // Coba connect langsung (ADB/Roku/Philips tidak butuh PIN)
                 pairingTvName = tv.displayName
                 pairingTv = tv
