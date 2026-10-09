@@ -22,6 +22,7 @@ import androidx.compose.material.icons.automirrored.filled.ArrowForward
 import androidx.compose.material.icons.filled.Fullscreen
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.SettingsRemote
+import androidx.compose.material.icons.filled.Wifi
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.runtime.Composable
@@ -45,8 +46,8 @@ fun MobileModeView(
     isLeftPaneVisible: Boolean,
     onTogglePane: () -> Unit,
     onOpenSettings: () -> Unit,
+    onOpenWifiServer: () -> Unit,
     onOpenRemote: () -> Unit,
-    onOpenConnectionDialog: () -> Unit,
     isConnected: Boolean,
     paneContent: @Composable () -> Unit
 ) {
@@ -54,7 +55,6 @@ fun MobileModeView(
     val activity = context as? Activity
 
     Row(modifier = Modifier.fillMaxSize()) {
-        // Jika PANE KANAN aktif -> Toolbar di KIRI
         if (!isLeftPaneVisible) {
             MobileToolbar(
                 isLeftPaneVisible = isLeftPaneVisible,
@@ -63,8 +63,8 @@ fun MobileModeView(
                 onFullscreen = {
                     activity?.requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE
                 },
+                onOpenWifiServer = onOpenWifiServer,
                 onOpenRemote = onOpenRemote,
-                onOpenConnectionDialog = onOpenConnectionDialog,
                 isConnected = isConnected
             )
         }
@@ -73,7 +73,6 @@ fun MobileModeView(
             paneContent()
         }
 
-        // Jika PANE KIRI aktif -> Toolbar di KANAN
         if (isLeftPaneVisible) {
             MobileToolbar(
                 isLeftPaneVisible = isLeftPaneVisible,
@@ -82,8 +81,8 @@ fun MobileModeView(
                 onFullscreen = {
                     activity?.requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE
                 },
+                onOpenWifiServer = onOpenWifiServer,
                 onOpenRemote = onOpenRemote,
-                onOpenConnectionDialog = onOpenConnectionDialog,
                 isConnected = isConnected
             )
         }
@@ -96,8 +95,8 @@ private fun MobileToolbar(
     onOpenSettings: () -> Unit,
     onTogglePane: () -> Unit,
     onFullscreen: () -> Unit,
+    onOpenWifiServer: () -> Unit,
     onOpenRemote: () -> Unit,
-    onOpenConnectionDialog: () -> Unit,
     isConnected: Boolean
 ) {
     Column(
@@ -109,7 +108,7 @@ private fun MobileToolbar(
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.Center
     ) {
-        // Gerigi -> Pengaturan
+        // Gerigi -> Pengaturan (Backup Aman)
         IconButton(onClick = onOpenSettings) {
             Icon(
                 Icons.Default.Settings,
@@ -119,7 +118,7 @@ private fun MobileToolbar(
             )
         }
 
-        Spacer(modifier = Modifier.height(18.dp))
+        Spacer(modifier = Modifier.height(16.dp))
 
         // Panah Switch Pane
         IconButton(onClick = onTogglePane) {
@@ -135,7 +134,7 @@ private fun MobileToolbar(
             )
         }
 
-        Spacer(modifier = Modifier.height(18.dp))
+        Spacer(modifier = Modifier.height(16.dp))
 
         // Fullscreen -> Paksa Landscape
         IconButton(onClick = onFullscreen) {
@@ -147,33 +146,33 @@ private fun MobileToolbar(
             )
         }
 
-        Spacer(modifier = Modifier.height(18.dp))
+        Spacer(modifier = Modifier.height(16.dp))
 
-        // Dot Status Koneksi
+        // Dot Status Koneksi -> BUKA SERVER WIFI
         Box(
             modifier = Modifier
-                .size(36.dp)
+                .size(38.dp)
                 .clip(CircleShape)
                 .background(DarkBgCardElevated)
                 .border(
-                    1.dp,
-                    if (isConnected) Color(0xFF22C55E).copy(alpha = 0.6f) else TextMuted.copy(alpha = 0.5f),
+                    1.5.dp,
+                    if (isConnected) Color(0xFF22C55E).copy(alpha = 0.7f) else StabiloLime.copy(alpha = 0.5f),
                     CircleShape
                 )
-                .clickable(onClick = onOpenConnectionDialog),
+                .clickable(onClick = onOpenWifiServer),
             contentAlignment = Alignment.Center
         ) {
-            Box(
-                modifier = Modifier
-                    .size(10.dp)
-                    .clip(CircleShape)
-                    .background(if (isConnected) Color(0xFF22C55E) else TextMuted)
+            Icon(
+                Icons.Default.Wifi,
+                contentDescription = "Server WiFi",
+                tint = if (isConnected) Color(0xFF22C55E) else StabiloLime,
+                modifier = Modifier.size(18.dp)
             )
         }
 
-        Spacer(modifier = Modifier.height(18.dp))
+        Spacer(modifier = Modifier.height(16.dp))
 
-        // Remote TV -> Buka jendela remote
+        // Remote TV
         IconButton(onClick = onOpenRemote) {
             Icon(
                 Icons.Default.SettingsRemote,
