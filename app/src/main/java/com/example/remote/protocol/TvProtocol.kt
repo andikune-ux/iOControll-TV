@@ -5,7 +5,10 @@ import dev.andikuneiocontroll.remote.discovery.DiscoveredTv
 /**
  * TvProtocol — interface umum untuk semua protokol TV.
  *
- * Setiap brand TV (Android TV, Samsung, LG, Roku, dll) mengimplementasikan interface ini.
+ * V2 (Update):
+ * - Tambah method pair() dengan default implementation (return null)
+ * - Protokol yang butuh pairing: Android TV (ADB), Samsung, LG, Vizio
+ * - Protokol yang tidak butuh: Roku, Philips
  */
 interface TvProtocol {
 
@@ -21,10 +24,10 @@ interface TvProtocol {
     fun canHandle(tv: DiscoveredTv): Boolean
 
     /**
-     * Connect ke TV. Kalau butuh pairing, akan tampilkan dialog PIN.
+     * Connect ke TV. Kalau butuh pairing, akan return error PAIRING_NEEDED.
      *
      * @param tv Target TV
-     * @param pairingCode PIN 6 digit (khusus Android TV) — bisa kosong kalau tidak butuh
+     * @param pairingCode PIN 6 digit (khusus Android TV) — bisa kosong
      * @param onResult Callback: (sukses, pesan)
      */
     suspend fun connect(
@@ -40,9 +43,6 @@ interface TvProtocol {
 
     /**
      * Kirim command ke TV.
-     *
-     * @param command Contoh: "DPAD_UP", "HOME", "BACK", "POWER", "VOLUME_UP"
-     * @param payload Data tambahan (misal: text untuk INPUT_TEXT)
      */
     suspend fun sendCommand(command: String, payload: String = "")
 
@@ -50,6 +50,21 @@ interface TvProtocol {
      * Cek status koneksi.
      */
     fun isConnected(): Boolean
+
+    /**
+     * Pairing (khusus Android TV ADB / Wireless Debugging).
+     * Protokol yang tidak butuh pairing: return null.
+     *
+     * @param host IP TV
+     * @param pairingPort Port pairing (37000-44000)
+     * @param pairingCode Kode 6 digit dari TV
+     * @return Pair(sukses, pesan) — null kalau protokol tidak support pairing
+     */
+    suspend fun pair(
+        host: String,
+        pairingPort: Int,
+        pairingCode: String
+    ): Pair<Boolean, String>? = null
 }
 
 /**
@@ -142,4 +157,6 @@ object TvCommand {
     const val LAUNCH_APP = "LAUNCH_APP"
     const val CAST_START = "CAST_START"
     const val CAST_STOP = "CAST_STOP"
+    const val COPY_TEXT = "COPY_TEXT"
+    const val ROTATE_SCREEN = "ROTATE_SCREEN"
 }
