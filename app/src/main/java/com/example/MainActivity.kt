@@ -12,6 +12,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -21,7 +22,7 @@ import dev.andikuneiocontroll.ui.MainScreen
 import dev.andikuneiocontroll.ui.OnboardingScreen
 import dev.andikuneiocontroll.ui.SplashScreen
 import dev.andikuneiocontroll.ui.theme.MyApplicationTheme
-import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.launch
 
 class MainActivity : ComponentActivity() {
 
@@ -43,12 +44,6 @@ class MainActivity : ComponentActivity() {
     }
 }
 
-/**
- * Flow utama aplikasi:
- * - Cek onboarding sudah selesai?
- *   - Belum → Splash → Onboarding → MainScreen
- *   - Sudah → Splash → MainScreen
- */
 private sealed interface AppState {
     data object Splash : AppState
     data object Onboarding : AppState
@@ -58,27 +53,25 @@ private sealed interface AppState {
 @Composable
 private fun AppNavigationFlow(viewModel: MainViewModel) {
     val context = LocalContext.current
+    val scope = rememberCoroutineScope()
     val prefs = remember { PrefsRepository(context) }
 
     var currentState by remember { mutableStateOf<AppState>(AppState.Splash) }
+    var onboardingDone by remember { mutableStateOf<Boolean?>(null) }
 
-    // Cek onboarding saat pertama buka
+    // Cek onboarding selesai atau belum
     LaunchedEffect(Unit) {
-        val onboardingDone = prefs.getOnboardingDoneOnce()
-        // State awal = Splash, setelah itu tentukan
-        // SplashScreen akan memanggil onFinished()
-        // jadi kita simpan flag dulu
-        onboardingDoneFlag = onboardingDone
+        onboardingDone = prefs.getOnboardingDoneOnce()
     }
 
     when (currentState) {
         AppState.Splash -> {
             SplashScreen(
                 onFinished = {
-                    currentState = if (onboardingDoneFlag) {
-                        AppState.Main
-                    } else {
-                        AppState.Onboarding
+                    currentState = when {
+                        onboardingDone == true -> AppState.Main
+                        onboardingDone == false -> AppState.Onboarding
+                        else -> AppState.Main  // fallback kalau null
                     }
                 }
             )
@@ -87,10 +80,7 @@ private fun AppNavigationFlow(viewModel: MainViewModel) {
         AppState.Onboarding -> {
             OnboardingScreen(
                 onFinished = {
-                    // Tandai onboarding selesai
-                    kotlinx.coroutines.MainScope().launch {
-                        prefs.setOnboardingDone(true)
-                    }
+                    scope.launch { prefs.setOnboardingDone(true) }
                     currentState = AppState.Main
                 }
             )
@@ -101,6 +91,3 @@ private fun AppNavigationFlow(viewModel: MainViewModel) {
         }
     }
 }
-
-// Flag global (sederhana) untuk menyimpan hasil cek onboarding
-private var onboardingDoneFlag: Boolean = false
