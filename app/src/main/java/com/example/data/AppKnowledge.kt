@@ -6,7 +6,19 @@ package dev.andikuneiocontroll.data
  * File ini berisi SEMUA memory, aturan kerja, dan informasi penting
  * yang diberikan user (Andi) ke AI selama pengerjaan project.
  *
- * WAJIB update setiap build kalau ada fitur/aturan baru.
+ * === PESAN UNTUK AI ASSISTANT SELANJUTNYA ===
+ * Kalau AI saat ini kena limit dan digantikan AI baru:
+ * 1. BACA file AppKnowledge.kt + UpdateHistory.kt INI DULU sebelum kerja
+ * 2. Ikuti SEMUA aturan di file ini (FORMAT_RULES, WORK_RULES, HARD_RULES)
+ * 3. User pakai GitHub Mobile (HP), JANGAN asumsi PC
+ * 4. Kirim KODE TIMPA FULL — bukan instruksi edit manual
+ * 5. Batas paste di GitHub Chrome HP: MAX 400 baris / 12.000 karakter per bubble
+ * 6. Kalau kode >400 baris → PECAH jadi beberapa BAGIAN (judul: "BAGIAN 1 DARI N")
+ * 7. Setelah user paste, MINTA user scroll cek akhir file — pastikan kurung tutup lengkap
+ * 8. Kalau build gagal — tunggu error dari user, JANGAN asumsi
+ * 9. Update UpdateHistory.kt + AppKnowledge.kt SETIAP kali ada perubahan
+ * 10. KERJAKAN PER KATEGORI FILE, bukan per fitur — biar user ga bolak-balik
+ * =============================================
  */
 object AppKnowledge {
 
@@ -17,7 +29,7 @@ object AppKnowledge {
     const val PACKAGE_NAME = "dev.andikuneiocontroll"
     const val REPO_URL = "https://github.com/andikune-ux/iOControll-TV"
     const val REPO_ACTIONS = "https://github.com/andikune-ux/iOControll-TV/actions"
-    const val CURRENT_VERSION = "V1.00.003"
+    const val CURRENT_VERSION = "V1.00.004"
     const val WIFI_SERVER_PORT = 23016
     const val TV_REMOTE_PORT = 6467
     const val ADB_PORT = 5555
@@ -29,10 +41,43 @@ object AppKnowledge {
     const val USER_EMAIL = "andikune@gmail.com"
     const val USER_DEVICE = "HP Android (bukan PC)"
     const val USER_TV = "Xiaomi Google TV (IP: 192.168.0.103)"
-    const val USER_WORK_MODE = "GitHub Mobile (tidak pakai PC)"
+    const val USER_WORK_MODE = "GitHub Mobile (Chrome HP — BUKAN PC)"
+    const val USER_EDITOR_LIMIT = "Max 400 baris / 12.000 karakter per paste di GitHub Chrome HP"
 
     // ==========================================================
-    // BAGIAN 1 — ATURAN FORMAT RESPON (WAJIB)
+    // PESAN UNTUK AI SELANJUTNYA
+    // ==========================================================
+    val MESSAGE_FOR_NEXT_AI: List<String> = listOf(
+        "=== PESAN UNTUK AI ASSISTANT SELANJUTNYA ===",
+        "Halo AI baru. Kamu melanjutkan project 'iOControll Tv' milik user Andi.",
+        "",
+        "ATURAN WAJIB:",
+        "1. Baca file ini (AppKnowledge.kt) + UpdateHistory.kt SEBELUM mulai kerja",
+        "2. Ikuti FORMAT_RULES, ANTI_TRUNCATION_RULES, WORK_RULES, HARD_RULES di file ini",
+        "3. User pakai GitHub Mobile di HP (Chrome) — JANGAN asumsi PC",
+        "4. Kirim KODE TIMPA FULL — bukan instruksi edit baris-per-baris",
+        "5. Batas paste di GitHub Chrome HP: MAX 400 baris / 12.000 karakter per bubble",
+        "6. Kalau kode >400 baris → PECAH jadi beberapa BAGIAN (judul: 'BAGIAN 1 DARI N')",
+        "7. Setelah user paste, MINTA user cek akhir file — pastikan kurung tutup lengkap",
+        "8. Kalau build gagal — tunggu error dari user, JANGAN asumsi",
+        "9. Update UpdateHistory.kt + AppKnowledge.kt SETIAP ada perubahan",
+        "10. KERJAKAN PER KATEGORI FILE, bukan per fitur — biar user ga bolak-balik",
+        "",
+        "SISA PEKERJAAN (per V1.00.004 — 10-10-2026):",
+        "- Build test FASE A+B+C+D belum dijalankan (Build #38 pending)",
+        "- Test APK ke TV Xiaomi (IP: 192.168.0.103)",
+        "- Aktifkan Developer Options + Wireless Debugging di TV Xiaomi",
+        "- Kalau ADB gagal → implementasi Android TV Remote v2 (TLS + protobuf)",
+        "- Test semua fitur remote (D-Pad, Volume, Mouse, Voice, Keyboard)",
+        "",
+        "FITUR PLACEHOLDER (belum jalan penuh):",
+        "- Copy Text dari TV (RemoteController.copyTextFromTv return null)",
+        "- Screen Cast (MediaProjection — placeholder)",
+        "- Firmware Info (hanya ADB support)"
+    )
+
+    // ==========================================================
+    // BAGIAN 1 — ATURAN FORMAT RESPON
     // ==========================================================
     val FORMAT_RULES: List<String> = listOf(
         "=== ATURAN FORMAT RESPON ===",
@@ -51,7 +96,7 @@ object AppKnowledge {
         "- Kalau kode tidak muat 1 bubble → tulis 'jangan commit dulu, masih ada sambungan'",
         "- JANGAN nolak buka link GitHub publik",
         "- JANGAN gabung link 1 file dengan link lain — pisah per file",
-        "- Kalau file panjang (>300 baris) → bagi jadi 3-7 BAGIAN kecil",
+        "- Kalau file panjang (>400 baris) → bagi jadi 3-7 BAGIAN kecil",
         "- Kalau paste gagal di HP → bagi jadi lebih banyak BAGIAN",
         "- User pakai HP — JANGAN kasih instruksi yang butuh PC",
         "- User minta KODE TIMPA FULL, bukan instruksi edit manual baris-per-baris"
@@ -62,6 +107,8 @@ object AppKnowledge {
     // ==========================================================
     val ANTI_TRUNCATION_RULES: List<String> = listOf(
         "=== ATURAN ANTI-TRUNCATION ===",
+        "BATAS PASTE GitHub Chrome HP: MAX 400 baris / 12.000 karakter per bubble",
+        "",
         "Kalau kode kepanjangan:",
         "1. Judul: 'BAGIAN 1 DARI N'",
         "2. Akhir: '(lanjut di BAGIAN berikutnya)'",
@@ -71,7 +118,8 @@ object AppKnowledge {
         "6. Kalau paste gagal di HP → bagi jadi lebih banyak BAGIAN",
         "7. Kalau file >400 baris → otomatis bagi jadi beberapa BAGIAN",
         "8. Saat user ketik 'lanjut' → kirim bagian berikutnya",
-        "9. Tutup kurung harus PAS — kelebihan 1 '}' bikin error build"
+        "9. Tutup kurung harus PAS — kelebihan 1 '}' bikin error build",
+        "10. Setelah paste, MINTA user cek akhir file — pastikan kurung tutup lengkap"
     )
 
     // ==========================================================
@@ -88,7 +136,8 @@ object AppKnowledge {
         "7. Konfirmasi sebelum lanjut",
         "8. Kalau build gagal — tunggu error, jangan asumsi",
         "9. Kalau user bilang 'timpa full' — kirim FULL kode, bukan instruksi edit",
-        "10. Kalau user bilang 'pecah jadi N' — bagi kode jadi N bagian"
+        "10. Kalau user bilang 'pecah jadi N' — bagi kode jadi N bagian",
+        "11. KERJAKAN PER KATEGORI FILE, bukan per fitur — biar user ga bolak-balik update file yang sama"
     )
 
     // ==========================================================
@@ -117,7 +166,7 @@ object AppKnowledge {
     )
 
     // ==========================================================
-    // BAGIAN 5 — IDENTITAS REPO & URL
+    // BAGIAN 5 — URL REPO
     // ==========================================================
     val REPO_URLS: List<String> = listOf(
         "Repo Utama  : https://github.com/andikune-ux/iOControll-TV",
@@ -127,204 +176,194 @@ object AppKnowledge {
         "LINK EDIT   : https://github.com/andikune-ux/iOControll-TV/edit/main/{path}",
         "LINK NEW    : https://github.com/andikune-ux/iOControll-TV/new/main/{path}"
     )
+    // ==========================================================
+// BAGIAN 6 — STRUKTUR FOLDER
+// ==========================================================
+val FOLDER_STRUCTURE: List<String> = listOf(
+    "app/src/main/java/dev/andikuneiocontroll/",
+    "├── MainActivity.kt          (flow Splash → Onboarding → Main)",
+    "├── MainViewModel.kt         (viewmodel utama + autoConnectLastTv)",
+    "├── data/local/              (Room + DataStore)",
+    "│   ├── TvEntity.kt          (+ hasChromecast + firmwareVersion)",
+    "│   ├── TvDao.kt",
+    "│   ├── TvDatabase.kt",
+    "│   ├── TvRepository.kt      (+ hasChromecast)",
+    "│   └── PrefsRepository.kt",
+    "├── data/                    (knowledge & history)",
+    "│   ├── AppKnowledge.kt      (file ini)",
+    "│   └── UpdateHistory.kt     (+ buildFailureHistory)",
+    "├── filemanager/FileManagerHelper.kt",
+    "├── model/Models.kt",
+    "├── remote/",
+    "│   ├── controller/",
+    "│   │   ├── RemoteController.kt      (+ pair + copyText + rotateScreen)",
+    "│   │   └── RemoteControllers.kt     (Voice, Keyboard, Mouse, Cast, Shortcut)",
+    "│   ├── discovery/",
+    "│   │   ├── DiscoveredTv.kt          (+ hasChromecast)",
+    "│   │   ├── MdnsDiscovery.kt         (deteksi _googlecast)",
+    "│   │   ├── SsdpDiscovery.kt",
+    "│   │   ├── TvDiscoveryManager.kt",
+    "│   │   └── TvFilter.kt",
+    "│   └── protocol/",
+    "│       ├── TvProtocol.kt            (+ pair + COPY_TEXT + ROTATE_SCREEN)",
+    "│       ├── ProtocolDetector.kt",
+    "│       ├── adb/",
+    "│       │   ├── AdbProtocol.kt",
+    "│       │   ├── AdbCrypto.kt",
+    "│       │   ├── AdbPairing.kt        (BARU — Wireless Debugging pairing)",
+    "│       │   ├── AdbClient.kt         (+ pair support)",
+    "│       │   └── AdbTvClient.kt       (+ needsPairing flag)",
+    "│       ├── roku/RokuEcpClient.kt",
+    "│       ├── samsung/SamsungTizenClient.kt",
+    "│       ├── lg/LgWebOsClient.kt",
+    "│       ├── philips/PhilipsClient.kt",
+    "│       └── vizio/VizioClient.kt",
+    "├── server/ (WifiFileServerService, WifiHttpServer, DiscoveryManager)",
+    "├── ui/",
+    "│   ├── MainScreen.kt        (FINAL — wire semua dialog)",
+    "│   ├── SplashAndOnboarding.kt",
+    "│   ├── remote/",
+    "│   │   ├── RemoteTvDialog.kt        (+ onOpenVoice + onOpenCopy)",
+    "│   │   ├── components/",
+    "│   │   │   ├── HapticHelper.kt",
+    "│   │   │   ├── RemoteButton.kt",
+    "│   │   │   ├── RemoteHeader.kt      (+ onNameClick)",
+    "│   │   │   ├── RemoteDPad.kt",
+    "│   │   │   ├── RemoteBars.kt        (TopBar, NavBar, MediaBar, VolumeBar, QuickBar)",
+    "│   │   │   └── RemoteModes.kt       (Grid, Mouse, Gesture, AirMouse)",
+    "│   │   ├── dialogs/",
+    "│   │   │   ├── TvDialogs.kt         (Picker, Pairing, Info, Input, Shortcut, ManualIp)",
+    "│   │   │   ├── AdbPairingDialog.kt  (BARU)",
+    "│   │   │   ├── VoiceDialog.kt       (BARU)",
+    "│   │   │   └── KeyboardDialog.kt    (BARU)",
+    "│   │   └── settings/RemoteSettingsScreen.kt",
+    "│   ├── filemanager/",
+    "│   ├── permissions/",
+    "│   └── theme/",
+    "├── util/BackupHelper.kt",
+    "└── viewers/Viewers.kt"
+)
 
-    // ==========================================================
-    // BAGIAN 6 — STRUKTUR FOLDER APLIKASI
-    // ==========================================================
-    val FOLDER_STRUCTURE: List<String> = listOf(
-        "app/src/main/java/dev/andikuneiocontroll/",
-        "├── MainActivity.kt          (flow Splash → Onboarding → Main)",
-        "├── MainViewModel.kt         (viewmodel utama)",
-        "├── data/local/              (Room + DataStore)",
-        "│   ├── TvEntity.kt",
-        "│   ├── TvDao.kt",
-        "│   ├── TvDatabase.kt",
-        "│   ├── TvRepository.kt",
-        "│   └── PrefsRepository.kt",
-        "├── data/                    (knowledge & history)",
-        "│   ├── AppKnowledge.kt",
-        "│   └── UpdateHistory.kt",
-        "├── filemanager/",
-        "│   └── FileManagerHelper.kt",
-        "├── model/Models.kt",
-        "├── remote/",
-        "│   ├── controller/",
-        "│   │   ├── RemoteController.kt",
-        "│   │   └── RemoteControllers.kt",
-        "│   ├── discovery/",
-        "│   │   ├── DiscoveredTv.kt",
-        "│   │   ├── MdnsDiscovery.kt",
-        "│   │   ├── SsdpDiscovery.kt",
-        "│   │   ├── TvDiscoveryManager.kt",
-        "│   │   └── TvFilter.kt",
-        "│   └── protocol/",
-        "│       ├── TvProtocol.kt",
-        "│       ├── ProtocolDetector.kt",
-        "│       ├── adb/ (AdbProtocol, AdbCrypto, AdbClient, AdbTvClient)",
-        "│       ├── roku/RokuEcpClient.kt",
-        "│       ├── samsung/SamsungTizenClient.kt",
-        "│       ├── lg/LgWebOsClient.kt",
-        "│       ├── philips/PhilipsClient.kt",
-        "│       └── vizio/VizioClient.kt",
-        "├── server/",
-        "│   ├── WifiFileServerService.kt",
-        "│   ├── WifiHttpServer.kt",
-        "│   └── DiscoveryManager.kt",
-        "├── ui/",
-        "│   ├── MainScreen.kt",
-        "│   ├── SplashAndOnboarding.kt",
-        "│   ├── remote/",
-        "│   │   ├── RemoteTvDialog.kt",
-        "│   │   ├── components/",
-        "│   │   │   ├── HapticHelper.kt",
-        "│   │   │   ├── RemoteButton.kt",
-        "│   │   │   ├── RemoteHeader.kt",
-        "│   │   │   ├── RemoteDPad.kt",
-        "│   │   │   ├── RemoteBars.kt",
-        "│   │   │   └── RemoteModes.kt",
-        "│   │   ├── dialogs/TvDialogs.kt",
-        "│   │   └── settings/RemoteSettingsScreen.kt",
-        "│   ├── filemanager/",
-        "│   ├── permissions/",
-        "│   └── theme/",
-        "├── util/",
-        "│   └── BackupHelper.kt",
-        "└── viewers/",
-        "    └── Viewers.kt"
-    )
+// ==========================================================
+// BAGIAN 7 — DAFTAR FITUR LENGKAP
+// ==========================================================
+val FEATURE_LIST: List<String> = listOf(
+    "=== TRANSFER FILE ===",
+    "1. File Manager Dual-Pane (X-plore style)",
+    "2. Server WiFi (port 23016) + NSD/mDNS discovery",
+    "3. Copy, Move, Rename, Delete, Compress, Extract",
+    "4. Auto-play video, Image viewer, Vault, Disk Map",
+    "",
+    "=== REMOTE TV (6 PROTOKOL) ===",
+    "1. ADB Wi-Fi (5555) + Wireless Debugging pairing (Android 11+)",
+    "2. Roku ECP (8060)",
+    "3. Samsung Tizen (8001/8002)",
+    "4. LG webOS SSAP (3000/3001)",
+    "5. Philips JointSpace (1925/1926)",
+    "6. Vizio SmartCast (9000)",
+    "",
+    "=== UI REMOTE (5 MODE) ===",
+    "1. D-Pad (default)",
+    "2. Grid (angka 0-9 + RGBY)",
+    "3. Mouse (touchpad)",
+    "4. Gesture (swipe = D-Pad)",
+    "5. Air Mouse (gyroscope)",
+    "",
+    "=== TOMBOL REMOTE ===",
+    "- Top Bar: Voice, Input, Cast, Keyboard, Copy, TV List",
+    "- Nav Bar: Home, Back, Recent, Mute",
+    "- Media Bar: Play, Pause, Stop, Rew, Fwd, Prev, Next",
+    "- Volume Bar: Vol+, Vol-, Ch+, Ch- (dengan gesture)",
+    "- Quick Bar: 5 mode switcher + Shortcut + Exit",
+    "",
+    "=== FITUR PENDUKUNG ===",
+    "- ADB Wireless Debugging Pairing",
+    "- Voice Input (Google Voice → TV)",
+    "- Keyboard Input (IME → TV)",
+    "- Chromecast Detection (_googlecast._tcp)",
+    "- Firmware Info (ADB)",
+    "- Screen Rotate Command",
+    "- Copy Text dari TV (placeholder)",
+    "- Volume Monitor Overlay",
+    "- Haptic Feedback",
+    "- Remote Settings",
+    "- Multi-TV Manager (Room)",
+    "- Auto-connect TV terakhir",
+    "- Splash + Onboarding",
+    "- Manual IP Fallback",
+    "- Backup Aman (14 bagian)"
+)
 
-    // ==========================================================
-    // BAGIAN 7 — DAFTAR FITUR LENGKAP
-    // ==========================================================
-    val FEATURE_LIST: List<String> = listOf(
-        "=== TRANSFER FILE ===",
-        "1. File Manager Dual-Pane (X-plore style)",
-        "   - 2 pane bersamaan di Mode TV, 1 pane di Mode HP",
-        "   - Copy, Move, Rename, Delete, Compress, Extract",
-        "   - Auto-play video, image viewer",
-        "   - Vault enkripsi, Disk Map",
-        "2. Server WiFi (port 23016)",
-        "   - Auto-scan perangkat di WiFi yang sama",
-        "   - NSD/mDNS discovery",
-        "",
-        "=== REMOTE TV (6 PROTOKOL) ===",
-        "1. ADB Wi-Fi (port 5555) — Android TV, Fire TV",
-        "2. Roku ECP (port 8060) — Roku TV",
-        "3. Samsung Tizen (port 8001/8002) — Samsung Smart TV",
-        "4. LG webOS SSAP (port 3000/3001) — LG Smart TV",
-        "5. Philips JointSpace (port 1925/1926) — Philips TV",
-        "6. Vizio SmartCast (port 9000) — Vizio TV",
-        "",
-        "=== UI REMOTE (5 MODE) ===",
-        "1. D-Pad (default) — bulat seperti remote fisik",
-        "2. Grid — angka 0-9 + tombol warna RGBY",
-        "3. Mouse — touchpad kursor",
-        "4. Gesture — swipe = D-Pad virtual",
-        "5. Air Mouse — gyroscope",
-        "",
-        "=== TOMBOL REMOTE ===",
-        "- Top Bar: Voice, Input, Cast, Keyboard, Copy, TV List",
-        "- Nav Bar: Home, Back, Recent, Mute",
-        "- Media Bar: Play, Pause, Stop, Rew, Fwd, Prev, Next",
-        "- Volume Bar: Vol+, Vol-, Ch+, Ch- (dengan gesture)",
-        "- Quick Bar: 5 mode switcher + Shortcut + Exit",
-        "",
-        "=== FITUR PENDUKUNG ===",
-        "- Volume Monitor Overlay (tap 0-30, hold 0-100% via gesture)",
-        "- Haptic Feedback (getar halus)",
-        "- Pengaturan Remote (haptic, sound, sensitivitas, ukuran tombol)",
-        "- Multi-TV Manager (simpan TV terdaftar di Room)",
-        "- Auto-connect ke TV terakhir",
-        "- Splash Screen + Onboarding 3 slide",
-        "- Manual IP fallback (untuk TV tidak terdeteksi)",
-        "- Backup Aman (14 bagian TXT)",
-        "",
-        "=== KEYSTORE PERMANEN ===",
-        "- Auto-generate di GitHub Actions build pertama",
-        "- Disimpan sebagai debug.keystore.base64",
-        "- Update APK tanpa uninstall"
-    )
+// ==========================================================
+// BAGIAN 8 — PREFERENSI USER
+// ==========================================================
+val USER_PREFERENCES: List<String> = listOf(
+    "=== PREFERENSI USER ===",
+    "1. Kode harus KODE TIMPA FULL — bukan instruksi edit manual",
+    "2. Kalau kode panjang → pecah jadi N bagian (user bilang 'pecah jadi N')",
+    "3. User pakai GitHub Mobile (HP Chrome), JANGAN asumsi PC",
+    "4. Batas paste di GitHub Chrome HP: MAX 400 baris / 12.000 karakter",
+    "5. KERJAKAN PER KATEGORI FILE — bukan per fitur (biar ga bolak-balik)",
+    "6. Kalau ada yang salah → perbaiki, jangan ngotot",
+    "7. Konfirmasi pemahaman SEBELUM eksekusi",
+    "8. Kalau build error → tunggu error, jangan tebak",
+    "",
+    "=== ATURAN UI ===",
+    "1. Tombol icon (bukan emoji)",
+    "2. Long-press 1 detik → tooltip muncul",
+    "3. Rainbow icon warna berputar smooth",
+    "4. Toolbar mode HP pindah kiri/kanan sesuai pane",
+    "5. Remote TV buka jendela BARU full screen",
+    "",
+    "=== ATURAN VOLUME ===",
+    "1. Tap Vol+/Vol- → naik/turun 1 level (0-30)",
+    "2. Tahan Vol+/Vol- → monitor volume + gesture bebas arah (0-100%)",
+    "3. Geser kanan/atas = naik, geser kiri/bawah = turun",
+    "4. Lepas tombol → monitor hilang"
+)
 
-    // ==========================================================
-    // BAGIAN 8 — PENGATURAN USER (Aturan Detail)
-    // ==========================================================
-    val USER_PREFERENCES: List<String> = listOf(
-        "=== PREFERENSI USER ===",
-        "1. Kode harus KODE TIMPA FULL — bukan instruksi edit manual",
-        "2. Kalau kode panjang → pecah jadi N bagian",
-        "3. Kalau user bilang 'pecah jadi 3' → bagi 3 bagian",
-        "4. User pakai GitHub Mobile (HP), JANGAN asumsi pakai PC",
-        "5. Kalau ada yang salah → perbaiki, jangan ngotot",
-        "6. Konfirmasi pemahaman SEBELUM eksekusi",
-        "7. Kalau build error → tunggu error, jangan tebak",
-        "",
-        "=== ATURAN UI ===",
-        "1. Tombol icon (bukan emoji)",
-        "2. Long-press 1 detik → tooltip muncul",
-        "3. Rainbow icon warna berputar smooth (Cyan→Lime→Yellow→Pink)",
-        "4. Toolbar mode HP pindah kiri/kanan sesuai pane aktif",
-        "5. Remote TV buka jendela BARU full screen (bukan popup)",
-        "6. Dialog kecil untuk popup (Server WiFi, dll)",
-        "",
-        "=== ATURAN VOLUME ===",
-        "1. Tap Vol+/Vol- → naik/turun 1 level (0-30), tanpa monitor",
-        "2. Tahan Vol+/Vol- → monitor volume muncul, gesture bebas arah (0-100%)",
-        "3. Geser kanan/atas = naik, geser kiri/bawah = turun",
-        "4. Lepas tombol → monitor hilang",
-        "5. Haptic getar halus saat volume berubah",
-        "",
-        "=== ATURAN REMOTE TV ===",
-        "1. TV harus support protokol (Android TV, Roku, Samsung, LG, dll)",
-        "2. TIDAK butuh install aplikasi di TV (kecuali pakai custom protocol)",
-        "3. Kalau auto-scan gagal → pakai Manual IP",
-        "4. Pairing code hanya untuk Android TV, Samsung, LG, Vizio",
-        "5. Roku & Philips tidak butuh pairing"
-    )
-
-    // ==========================================================
-    // BAGIAN 9 — ATURAN KHUSUS PROJECT INI
-    // ==========================================================
-    val PROJECT_SPECIFIC_RULES: List<String> = listOf(
-        "=== ATURAN KHUSUS iOControll Tv ===",
-        "1. Port WiFi Server: 23016 (JANGAN diubah)",
-        "2. Port TV Remote: 6467 (Android TV v2) / 5555 (ADB)",
-        "3. Package: dev.andikuneiocontroll (JANGAN diubah)",
-        "4. Backup Aman path: /sdcard/IOremote TV/Backup Aman/",
-        "5. Backup Aman harus update setiap build",
-        "6. Format file backup: Backup Aman-iOControllTv-DD-MM-YYYY.TXT",
-        "7. Backup berisi 14 bagian (Header, Pengaturan, Identitas, Memory, Struktur, Menu, Fitur, Riwayat Update, Riwayat Bug, Riwayat Error, Riwayat Build, Link GitHub, Aturan Keras, Full Source)",
-        "",
-        "=== ATURAN UPDATE KNOWLEDGE ===",
-        "Setiap kali ada fitur/bug/perubahan baru:",
-        "1. Tambah entri di UpdateHistory.kt",
-        "2. Tambah di AppKnowledge.kt (FIXED_BUGS atau FEATURE_LIST)",
-        "3. Tambah di BuildFailureHistory kalau build gagal",
-        "4. Update version di AppKnowledge CURRENT_VERSION"
-    )
+// ==========================================================
+// BAGIAN 9 — ATURAN PROJECT
+// ==========================================================
+val PROJECT_SPECIFIC_RULES: List<String> = listOf(
+    "=== ATURAN KHUSUS iOControll Tv ===",
+    "1. Port WiFi Server: 23016 (JANGAN diubah)",
+    "2. Port TV Remote: 6467 (Android TV v2) / 5555 (ADB)",
+    "3. Package: dev.andikuneiocontroll (JANGAN diubah)",
+    "4. Backup Aman path: /sdcard/IOremote TV/Backup Aman/",
+    "5. Backup Aman format: Backup Aman-iOControllTv-DD-MM-YYYY.TXT",
+    "6. Backup berisi 14 bagian",
+    "7. Update knowledge SETIAP build",
+    "8. TIDAK ADA fitur nice-to-have yang akan dikerjakan (Sleep Timer, Macro, Widget, dll)"
+)
 
     // ==========================================================
     // BAGIAN 10 — RIWAYAT BUG DIPERBAIKI
     // ==========================================================
     val FIXED_BUGS: List<String> = listOf(
-        "[08-10-2026] WifiFileServerService.kt terpotong → restorasi full class",
-        "[08-10-2026] Namespace com.example → migrasi ke dev.andikuneiocontroll",
+        "[08-10-2026] WifiFileServerService.kt terpotong → restorasi",
+        "[08-10-2026] Namespace com.example → dev.andikuneiocontroll",
         "[08-10-2026] META-INF/INDEX.LIST duplicate → packaging excludes",
-        "[08-10-2026] Icon deprecated → ganti AutoMirrored",
-        "[08-10-2026] Missing import height di RemoteTvDialog",
-        "[08-10-2026] Keystore bentrok tiap build → keystore permanen",
-        "[08-10-2026] Pane Kanan buka ConnectionPaneView → ganti FilePaneView",
-        "[08-10-2026] Toolbar Mode HP tidak dinamis → MobileModeView adaptif",
+        "[08-10-2026] Icon deprecated → AutoMirrored",
+        "[08-10-2026] Missing import height",
+        "[08-10-2026] Keystore bentrok → permanen base64",
+        "[08-10-2026] Pane Kanan ConnectionPaneView → FilePaneView",
+        "[08-10-2026] Toolbar Mode HP tidak dinamis",
         "[08-10-2026] Panah switch pane tidak berubah arah",
-        "[08-10-2026] Dialog Server WiFi fullscreen → popup kecil",
-        "[09-10-2026] Conflicting overloads RemoteTopBar/NavBar → hapus file lama",
-        "[09-10-2026] Unresolved KeyboardArrowUp/Down → tambah import",
-        "[09-10-2026] MutableState<Long> delegate error → mutableLongStateOf",
-        "[09-10-2026] Unresolved weight di SizeButton → RowScope extension",
-        "[09-10-2026] MainScreen pakai RemoteTvDialog lama → ganti versi baru",
-        "[09-10-2026] Discovery tidak deteksi Google TV → Manual IP fallback",
-        "[09-10-2026] Kurung tutup berlebih di MainScreen → hapus 1 '}'",
-        "[09-10-2026] MainViewModel masih import file lama → hapus import",
-        "[09-10-2026] File lama duplikat (RemoteTopBar, RemoteNavBar) → hapus"
+        "[08-10-2026] Dialog Server WiFi fullscreen → popup",
+        "[09-10-2026] Conflicting overloads RemoteTopBar/NavBar",
+        "[09-10-2026] Unresolved KeyboardArrowUp/Down",
+        "[09-10-2026] MutableState<Long> → mutableLongStateOf",
+        "[09-10-2026] Unresolved 'weight' → RowScope extension",
+        "[09-10-2026] MainScreen pakai RemoteTvDialog lama",
+        "[09-10-2026] Discovery tidak deteksi Google TV → Manual IP",
+        "[09-10-2026] Kurung tutup berlebih di MainScreen",
+        "[09-10-2026] MainViewModel masih import file lama",
+        "[09-10-2026] File lama duplikat (RemoteTopBar, RemoteNavBar)",
+        "[10-10-2026] ADB Pairing untuk Google TV → libadb-android",
+        "[10-10-2026] Voice Input placeholder → full implementation",
+        "[10-10-2026] Keyboard Input placeholder → full implementation",
+        "[10-10-2026] Chromecast detection via mDNS _googlecast"
     )
 
     // ==========================================================
@@ -342,33 +381,53 @@ object AppKnowledge {
         "#35b   : MutableState<Long> → mutableLongStateOf",
         "#35c   : weight unresolved → RowScope extension",
         "#36    : Top level declaration → hapus '}' berlebih",
-        "#37    : RemoteClient/Server unresolved → hapus import"
+        "#37    : RemoteClient/Server unresolved → hapus import",
+        "#38    : PENDING — Build v1.00.004 belum dijalankan"
     )
 
     // ==========================================================
-    // BAGIAN 12 — ATURAN KERJA SAMA DENGAN AI BARU
+    // BAGIAN 12 — ATURAN AI HANDOVER
     // ==========================================================
     val AI_HANDOVER_RULES: List<String> = listOf(
         "=== KALAU USER GANTI AI ===",
         "AI baru WAJIB:",
-        "1. Baca AppKnowledge.kt terlebih dahulu",
+        "1. Baca AppKnowledge.kt + UpdateHistory.kt terlebih dahulu",
         "2. Pahami struktur aplikasi + isi kode",
-        "3. Ikuti aturan format respon",
-        "4. Ikuti aturan anti-truncation",
-        "5. Ikuti aturan link GitHub",
-        "6. Konfirmasi dulu sebelum eksekusi",
-        "7. Jangan menebak — tanya user kalau tidak tahu",
-        "8. User pakai HP (GitHub Mobile) — JANGAN asumsi PC",
-        "9. Kirim KODE TIMPA FULL, bukan instruksi edit manual",
-        "10. Kalau user bilang 'pecah jadi N' → bagi jadi N bagian"
+        "3. Ikuti FORMAT_RULES, ANTI_TRUNCATION_RULES, WORK_RULES",
+        "4. User pakai HP (GitHub Mobile) — JANGAN asumsi PC",
+        "5. Kirim KODE TIMPA FULL, bukan instruksi edit manual",
+        "6. Batas paste GitHub Chrome HP: MAX 400 baris / 12.000 karakter",
+        "7. Kalau kode >400 baris → PECAH jadi beberapa BAGIAN",
+        "8. Konfirmasi dulu sebelum eksekusi",
+        "9. Jangan menebak — tanya user kalau tidak tahu",
+        "10. Update UpdateHistory.kt + AppKnowledge.kt SETIAP ada perubahan"
     )
 
     // ==========================================================
-    // BAGIAN 13 — PENGATURAN USER (template statis)
+    // BAGIAN 13 — SISA PEKERJAAN
+    // ==========================================================
+    val PENDING_WORK: List<String> = listOf(
+        "=== SISA PEKERJAAN V1.00.004 ===",
+        "",
+        "WAJIB (belum dikerjakan):",
+        "1. Build test FASE A+B+C+D (Build #38 pending)",
+        "2. Test APK ke TV Xiaomi (IP: 192.168.0.103)",
+        "3. Aktifkan Developer Options + Wireless Debugging di TV Xiaomi",
+        "4. Kalau ADB gagal → implementasi Android TV Remote v2 (TLS + protobuf)",
+        "5. Test semua fitur (D-Pad, Volume, Mouse, Voice, Keyboard)",
+        "",
+        "PLACEHOLDER (UI ada, fungsi belum jalan):",
+        "- Copy Text dari TV (RemoteController.copyTextFromTv return null)",
+        "- Screen Cast (MediaProjection placeholder)",
+        "- Firmware Info (hanya ADB support)"
+    )
+
+    // ==========================================================
+    // BAGIAN 14 — PENGATURAN USER
     // ==========================================================
     val SETTINGS_MENU: List<String> = listOf(
         "1. Server WiFi (Transfer File)",
-        "2. Remote TV (6 Protokol)",
+        "2. Remote TV (6 Protokol + ADB Pairing)",
         "3. Pengaturan Remote (haptic, sound, sensitivitas, ukuran tombol)",
         "4. Backup Aman",
         "5. Tentang Aplikasi"
