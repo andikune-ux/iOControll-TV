@@ -15,6 +15,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 
+
 /**
  * RemoteController — Facade untuk semua protokol TV.
  *
@@ -175,6 +176,49 @@ class RemoteController(context: Context) {
         val current = _connectionState.value
         _connectionState.value = current.copy(error = "")
     }
+    // ==========================================
+// PAIRING (khusus ADB Wireless Debugging)
+// ==========================================
+
+/**
+ * Pair ke TV (khusus ADB Wireless Debugging).
+ * Setelah sukses, panggil connect() lagi.
+ */
+suspend fun pair(
+    host: String,
+    pairingPort: Int,
+    pairingCode: String
+): Pair<Boolean, String> {
+    return try {
+        // Cari protokol yang support pairing (AdbTvClient)
+        val adbProtocol = allProtocols.firstOrNull { it is AdbTvClient } as? AdbTvClient
+        if (adbProtocol == null) {
+            return false to "Protokol ADB tidak tersedia"
+        }
+        adbProtocol.pair(host, pairingPort, pairingCode)
+    } catch (e: Exception) {
+        e.printStackTrace()
+        false to "Error pairing: ${e.message ?: "Unknown"}"
+    }
+}
+
+/**
+ * Cek apakah protokol aktif butuh pairing.
+ * Return: (needsPairing, host, port) — null kalau tidak butuh
+ */
+fun getPairingInfo(): Triple<Boolean, String, Int>? {
+    val adbProtocol = allProtocols.firstOrNull { it is AdbTvClient } as? AdbTvClient
+        ?: return null
+    return Triple(adbProtocol.needsPairing, adbProtocol.pairingHost, adbProtocol.pairingPort)
+}
+
+/**
+ * Reset pairing untuk TV tertentu.
+ */
+fun clearPairing(host: String? = null) {
+    val adbProtocol = allProtocols.firstOrNull { it is AdbTvClient } as? AdbTvClient
+    adbProtocol?.clearPairing(host)
+}
 
     // ==========================================
     // QUICK COMMANDS
