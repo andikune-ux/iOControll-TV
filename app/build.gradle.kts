@@ -2,6 +2,7 @@ plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.android)
     alias(libs.plugins.kotlin.compose)
+    alias(libs.plugins.ksp)
 }
 
 android {
@@ -13,8 +14,12 @@ android {
         minSdk = 24
         targetSdk = 34
         versionCode = 1
-        versionName = "V1.00.000"
+        versionName = "V1.00.001"
         vectorDrawables { useSupportLibrary = true }
+
+        ksp {
+            arg("room.schemaLocation", "$projectDir/schemas")
+        }
     }
 
     signingConfigs {
@@ -64,10 +69,12 @@ android {
 }
 
 dependencies {
+    // AndroidX Core
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.lifecycle.runtime.ktx)
     implementation(libs.androidx.activity.compose)
-    
+
+    // Compose
     implementation(platform(libs.androidx.compose.bom))
     implementation(libs.androidx.ui)
     implementation(libs.androidx.ui.graphics)
@@ -77,8 +84,10 @@ dependencies {
     implementation(libs.androidx.navigation.compose)
     debugImplementation(libs.androidx.ui.tooling)
 
+    // Coroutines
     implementation(libs.kotlinx.coroutines.android)
 
+    // Ktor
     implementation(libs.ktor.server.core)
     implementation(libs.ktor.server.netty)
     implementation(libs.ktor.server.content.negotiation)
@@ -86,12 +95,36 @@ dependencies {
     implementation(libs.ktor.client.core)
     implementation(libs.ktor.client.android)
 
+    // Media3
     implementation(libs.androidx.media3.exoplayer)
     implementation(libs.androidx.media3.ui)
 
+    // Coil
     implementation(libs.coil.compose)
 
+    // DocumentFile
     implementation(libs.androidx.documentfile)
 
+    // Accompanist
     implementation(libs.accompanist.permissions)
+
+    // ==== REMOTE TV ====
+
+    // OkHttp (WebSocket Samsung, LG, Roku)
+    implementation(libs.okhttp)
+
+    // Moshi (JSON)
+    implementation(libs.moshi)
+    implementation(libs.moshi.kotlin)
+
+    // Room (Database TV)
+    implementation(libs.room.runtime)
+    implementation(libs.room.ktx)
+    ksp(libs.room.compiler)
+
+    // mDNS
+    implementation(libs.jmdns)
+
+    // DataStore
+    implementation(libs.androidx.datastore.preferences)
 }
