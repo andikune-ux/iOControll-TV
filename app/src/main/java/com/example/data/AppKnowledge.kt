@@ -433,3 +433,18 @@ val PROJECT_SPECIFIC_RULES: List<String> = listOf(
         "5. Tentang Aplikasi"
     )
 }
+    // ==========================================================
+    // COMPATIBILITY ALIASES (untuk BackupHelper)
+    // ==========================================================
+    val MEMORY_KNOWLEDGE: List<String> = 
+        MESSAGE_FOR_NEXT_AI + 
+        FORMAT_RULES + 
+        ANTI_TRUNCATION_RULES + 
+        WORK_RULES + 
+        HARD_RULES + 
+        AI_HANDOVER_RULES
+
+    val ERROR_HISTORY: List<String> = 
+        FIXED_BUGS + 
+        BUILD_ERROR_HISTORY
+}
