@@ -86,7 +86,8 @@ fun RemoteTvDialog(
     onOpenInputSource: () -> Unit = {},
     onOpenKeyboard: () -> Unit = {},
     onOpenCast: () -> Unit = {},
-    onOpenShortcut: () -> Unit = {}
+    onOpenShortcut: () -> Unit = {},
+    onOpenInfoTv: () -> Unit = {}
 ) {
     val context = LocalContext.current
     val activity = context as? Activity
