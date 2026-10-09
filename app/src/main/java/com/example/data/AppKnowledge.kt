@@ -17,7 +17,7 @@ package dev.andikuneiocontroll.data
  * 7. Setelah user paste, MINTA user scroll cek akhir file — pastikan kurung tutup lengkap
  * 8. Kalau build gagal — tunggu error dari user, JANGAN asumsi
  * 9. Update UpdateHistory.kt + AppKnowledge.kt SETIAP kali ada perubahan
- * 10. KERJAKAN PER KATEGORI FILE, bukan per fitur — biar user ga bolak-balik
+ * 10. KERJAKAN PER KATEGORI FILE, bukan per fitur
  * =============================================
  */
 object AppKnowledge {
@@ -42,7 +42,7 @@ object AppKnowledge {
     const val USER_DEVICE = "HP Android (bukan PC)"
     const val USER_TV = "Xiaomi Google TV (IP: 192.168.0.103)"
     const val USER_WORK_MODE = "GitHub Mobile (Chrome HP — BUKAN PC)"
-    const val USER_EDITOR_LIMIT = "Max 400 baris / 12.000 karakter per paste di GitHub Chrome HP"
+    const val USER_EDITOR_LIMIT = "Max 400 baris / 12.000 karakter per paste"
 
     // ==========================================================
     // PESAN UNTUK AI SELANJUTNYA
@@ -52,27 +52,27 @@ object AppKnowledge {
         "Halo AI baru. Kamu melanjutkan project 'iOControll Tv' milik user Andi.",
         "",
         "ATURAN WAJIB:",
-        "1. Baca file ini (AppKnowledge.kt) + UpdateHistory.kt SEBELUM mulai kerja",
-        "2. Ikuti FORMAT_RULES, ANTI_TRUNCATION_RULES, WORK_RULES, HARD_RULES di file ini",
+        "1. Baca AppKnowledge.kt + UpdateHistory.kt SEBELUM mulai kerja",
+        "2. Ikuti FORMAT_RULES, ANTI_TRUNCATION_RULES, WORK_RULES, HARD_RULES",
         "3. User pakai GitHub Mobile di HP (Chrome) — JANGAN asumsi PC",
         "4. Kirim KODE TIMPA FULL — bukan instruksi edit baris-per-baris",
-        "5. Batas paste di GitHub Chrome HP: MAX 400 baris / 12.000 karakter per bubble",
-        "6. Kalau kode >400 baris → PECAH jadi beberapa BAGIAN (judul: 'BAGIAN 1 DARI N')",
-        "7. Setelah user paste, MINTA user cek akhir file — pastikan kurung tutup lengkap",
+        "5. Batas paste: MAX 400 baris / 12.000 karakter per bubble",
+        "6. Kode >400 baris → PECAH jadi beberapa BAGIAN",
+        "7. Setelah paste, cek akhir file — pastikan kurung tutup lengkap",
         "8. Kalau build gagal — tunggu error dari user, JANGAN asumsi",
         "9. Update UpdateHistory.kt + AppKnowledge.kt SETIAP ada perubahan",
-        "10. KERJAKAN PER KATEGORI FILE, bukan per fitur — biar user ga bolak-balik",
+        "10. KERJAKAN PER KATEGORI FILE, bukan per fitur",
         "",
         "SISA PEKERJAAN (per V1.00.004 — 10-10-2026):",
-        "- Build test FASE A+B+C+D belum dijalankan (Build #38 pending)",
-        "- Test APK ke TV Xiaomi (IP: 192.168.0.103)",
+        "- Build test v1.00.004 belum dijalankan",
+        "- Test APK ke TV Xiaomi (192.168.0.103)",
         "- Aktifkan Developer Options + Wireless Debugging di TV Xiaomi",
         "- Kalau ADB gagal → implementasi Android TV Remote v2 (TLS + protobuf)",
-        "- Test semua fitur remote (D-Pad, Volume, Mouse, Voice, Keyboard)",
+        "- Test semua fitur remote",
         "",
-        "FITUR PLACEHOLDER (belum jalan penuh):",
-        "- Copy Text dari TV (RemoteController.copyTextFromTv return null)",
-        "- Screen Cast (MediaProjection — placeholder)",
+        "FITUR PLACEHOLDER:",
+        "- Copy Text dari TV (return null)",
+        "- Screen Cast (MediaProjection placeholder)",
         "- Firmware Info (hanya ADB support)"
     )
 
@@ -81,25 +81,23 @@ object AppKnowledge {
     // ==========================================================
     val FORMAT_RULES: List<String> = listOf(
         "=== ATURAN FORMAT RESPON ===",
-        "Elemen wajib setiap respon:",
         "1. Visualisasi folder (emoji + indentasi)",
         "2. Path lengkap file",
         "3. Nama file",
         "4. URL edit / URL new",
-        "5. Kode timpa FULL (jangan instruksi baris-per-baris)",
-        "6. Pesan commit (contoh: 'Update MainActivity.kt')",
+        "5. Kode timpa FULL",
+        "6. Pesan commit",
         "",
         "ATURAN:",
-        "- Pakai code block (3 backtick) untuk path/URL/nama file",
+        "- Pakai code block untuk path/URL/nama file",
         "- Bahasa Indonesia yang mudah dipahami",
         "- 1 chat = 1 fitur utuh kalau muat",
-        "- Kalau kode tidak muat 1 bubble → tulis 'jangan commit dulu, masih ada sambungan'",
+        "- Kalau tidak muat 1 bubble → tulis 'jangan commit dulu'",
         "- JANGAN nolak buka link GitHub publik",
-        "- JANGAN gabung link 1 file dengan link lain — pisah per file",
-        "- Kalau file panjang (>400 baris) → bagi jadi 3-7 BAGIAN kecil",
-        "- Kalau paste gagal di HP → bagi jadi lebih banyak BAGIAN",
-        "- User pakai HP — JANGAN kasih instruksi yang butuh PC",
-        "- User minta KODE TIMPA FULL, bukan instruksi edit manual baris-per-baris"
+        "- JANGAN gabung link 1 file dengan link lain",
+        "- File >400 baris → bagi jadi 3-7 BAGIAN kecil",
+        "- User pakai HP — JANGAN kasih instruksi PC",
+        "- User minta KODE TIMPA FULL"
     )
 
     // ==========================================================
@@ -109,17 +107,16 @@ object AppKnowledge {
         "=== ATURAN ANTI-TRUNCATION ===",
         "BATAS PASTE GitHub Chrome HP: MAX 400 baris / 12.000 karakter per bubble",
         "",
-        "Kalau kode kepanjangan:",
         "1. Judul: 'BAGIAN 1 DARI N'",
         "2. Akhir: '(lanjut di BAGIAN berikutnya)'",
         "3. Awal: '(sambungan dari BAGIAN sebelumnya)'",
         "4. JANGAN potong di tengah fungsi",
         "5. JANGAN bilang 'kode dilanjut di chat berikutnya'",
-        "6. Kalau paste gagal di HP → bagi jadi lebih banyak BAGIAN",
-        "7. Kalau file >400 baris → otomatis bagi jadi beberapa BAGIAN",
+        "6. Paste gagal di HP → bagi jadi lebih banyak BAGIAN",
+        "7. File >400 baris → otomatis bagi jadi beberapa BAGIAN",
         "8. Saat user ketik 'lanjut' → kirim bagian berikutnya",
         "9. Tutup kurung harus PAS — kelebihan 1 '}' bikin error build",
-        "10. Setelah paste, MINTA user cek akhir file — pastikan kurung tutup lengkap"
+        "10. Setelah paste, cek akhir file — pastikan kurung tutup lengkap"
     )
 
     // ==========================================================
@@ -135,34 +132,29 @@ object AppKnowledge {
         "6. JANGAN buka file sama 2x tanpa alasan",
         "7. Konfirmasi sebelum lanjut",
         "8. Kalau build gagal — tunggu error, jangan asumsi",
-        "9. Kalau user bilang 'timpa full' — kirim FULL kode, bukan instruksi edit",
+        "9. Kalau user bilang 'timpa full' — kirim FULL kode",
         "10. Kalau user bilang 'pecah jadi N' — bagi kode jadi N bagian",
-        "11. KERJAKAN PER KATEGORI FILE, bukan per fitur — biar user ga bolak-balik update file yang sama"
+        "11. KERJAKAN PER KATEGORI FILE, bukan per fitur"
     )
 
     // ==========================================================
-    // BAGIAN 4 — ATURAN SIGNATURE / KEYSTORE (WAJIB)
+    // BAGIAN 4 — ATURAN SIGNATURE / KEYSTORE
     // ==========================================================
     val HARD_RULES: List<String> = listOf(
         "=== ATURAN KERAS SIGNATURE / KEYSTORE ===",
-        "JANGAN PERNAH ubah file-file ini:",
-        "1. debug.keystore.base64 (root repo)",
-        "2. Blok signingConfigs di app/build.gradle.kts",
-        "3. Bagian keystore di .github/workflows/build.yml",
+        "JANGAN PERNAH ubah:",
+        "1. debug.keystore.base64",
+        "2. signingConfigs di app/build.gradle.kts",
+        "3. keystore di build.yml",
         "",
         "ATURAN INSTALL APK:",
         "- SELALU install dari GitHub Actions Artifacts",
         "- JANGAN install APK dari AI Studio",
-        "- Alasan: signature beda → Android tolak → bentrok",
         "",
         "ATURAN KALAU PAKAI AI STUDIO:",
-        "- Tekankan di prompt: 'JANGAN ubah debug.keystore, signingConfigs, workflow signing'",
-        "- AI Studio cuma boleh EDIT kode Kotlin/XML saja",
-        "- Build tetap via GitHub Actions",
-        "",
-        "RIWAYAT KEJADIAN:",
-        "- 08-10-2026: Keystore baru tiap build → bentrok install",
-        "- Solusi: Simpan keystore permanen sebagai debug.keystore.base64"
+        "- JANGAN ubah debug.keystore, signingConfigs, workflow signing",
+        "- AI Studio cuma boleh EDIT kode Kotlin/XML",
+        "- Build tetap via GitHub Actions"
     )
 
     // ==========================================================
@@ -229,8 +221,8 @@ val FOLDER_STRUCTURE: List<String> = listOf(
     "│   │   │   ├── RemoteButton.kt",
     "│   │   │   ├── RemoteHeader.kt      (+ onNameClick)",
     "│   │   │   ├── RemoteDPad.kt",
-    "│   │   │   ├── RemoteBars.kt        (TopBar, NavBar, MediaBar, VolumeBar, QuickBar)",
-    "│   │   │   └── RemoteModes.kt       (Grid, Mouse, Gesture, AirMouse)",
+    "│   │   │   ├── RemoteBars.kt",
+    "│   │   │   └── RemoteModes.kt",
     "│   │   ├── dialogs/",
     "│   │   │   ├── TvDialogs.kt         (Picker, Pairing, Info, Input, Shortcut, ManualIp)",
     "│   │   │   ├── AdbPairingDialog.kt  (BARU)",
@@ -300,10 +292,10 @@ val FEATURE_LIST: List<String> = listOf(
 val USER_PREFERENCES: List<String> = listOf(
     "=== PREFERENSI USER ===",
     "1. Kode harus KODE TIMPA FULL — bukan instruksi edit manual",
-    "2. Kalau kode panjang → pecah jadi N bagian (user bilang 'pecah jadi N')",
+    "2. Kalau kode panjang → pecah jadi N bagian",
     "3. User pakai GitHub Mobile (HP Chrome), JANGAN asumsi PC",
     "4. Batas paste di GitHub Chrome HP: MAX 400 baris / 12.000 karakter",
-    "5. KERJAKAN PER KATEGORI FILE — bukan per fitur (biar ga bolak-balik)",
+    "5. KERJAKAN PER KATEGORI FILE — bukan per fitur",
     "6. Kalau ada yang salah → perbaiki, jangan ngotot",
     "7. Konfirmasi pemahaman SEBELUM eksekusi",
     "8. Kalau build error → tunggu error, jangan tebak",
@@ -334,9 +326,8 @@ val PROJECT_SPECIFIC_RULES: List<String> = listOf(
     "5. Backup Aman format: Backup Aman-iOControllTv-DD-MM-YYYY.TXT",
     "6. Backup berisi 14 bagian",
     "7. Update knowledge SETIAP build",
-    "8. TIDAK ADA fitur nice-to-have yang akan dikerjakan (Sleep Timer, Macro, Widget, dll)"
+    "8. TIDAK ADA fitur nice-to-have yang akan dikerjakan"
 )
-
     // ==========================================================
     // BAGIAN 10 — RIWAYAT BUG DIPERBAIKI
     // ==========================================================
@@ -363,7 +354,10 @@ val PROJECT_SPECIFIC_RULES: List<String> = listOf(
         "[10-10-2026] ADB Pairing untuk Google TV → libadb-android",
         "[10-10-2026] Voice Input placeholder → full implementation",
         "[10-10-2026] Keyboard Input placeholder → full implementation",
-        "[10-10-2026] Chromecast detection via mDNS _googlecast"
+        "[10-10-2026] Chromecast detection via mDNS _googlecast",
+        "[10-10-2026] libadb-android group salah → ganti ke JitPack com.github.MuntashirAkon",
+        "[10-10-2026] 'pair' hides member TvProtocol → tambah override modifier",
+        "[10-10-2026] Kurung tutup berlebih di AppKnowledge.kt → timpa full"
     )
 
     // ==========================================================
@@ -382,7 +376,9 @@ val PROJECT_SPECIFIC_RULES: List<String> = listOf(
         "#35c   : weight unresolved → RowScope extension",
         "#36    : Top level declaration → hapus '}' berlebih",
         "#37    : RemoteClient/Server unresolved → hapus import",
-        "#38    : PENDING — Build v1.00.004 belum dijalankan"
+        "#38    : libadb-android tidak ditemukan → tambah JitPack repo + fix group",
+        "#38b   : 'pair' override + AdbPairingDialog 404 + AppKnowledge MEMORY_KNOWLEDGE",
+        "#38c   : AppKnowledge kurung tutup berlebih → timpa full"
     )
 
     // ==========================================================
@@ -400,7 +396,8 @@ val PROJECT_SPECIFIC_RULES: List<String> = listOf(
         "7. Kalau kode >400 baris → PECAH jadi beberapa BAGIAN",
         "8. Konfirmasi dulu sebelum eksekusi",
         "9. Jangan menebak — tanya user kalau tidak tahu",
-        "10. Update UpdateHistory.kt + AppKnowledge.kt SETIAP ada perubahan"
+        "10. Update UpdateHistory.kt + AppKnowledge.kt SETIAP ada perubahan",
+        "11. KERJAKAN PER KATEGORI FILE, bukan per fitur"
     )
 
     // ==========================================================
@@ -410,7 +407,7 @@ val PROJECT_SPECIFIC_RULES: List<String> = listOf(
         "=== SISA PEKERJAAN V1.00.004 ===",
         "",
         "WAJIB (belum dikerjakan):",
-        "1. Build test FASE A+B+C+D (Build #38 pending)",
+        "1. Build test v1.00.004 (setelah commit AppKnowledge + AdbPairingDialog)",
         "2. Test APK ke TV Xiaomi (IP: 192.168.0.103)",
         "3. Aktifkan Developer Options + Wireless Debugging di TV Xiaomi",
         "4. Kalau ADB gagal → implementasi Android TV Remote v2 (TLS + protobuf)",
@@ -432,19 +429,19 @@ val PROJECT_SPECIFIC_RULES: List<String> = listOf(
         "4. Backup Aman",
         "5. Tentang Aplikasi"
     )
-}
+
     // ==========================================================
     // COMPATIBILITY ALIASES (untuk BackupHelper)
     // ==========================================================
-    val MEMORY_KNOWLEDGE: List<String> = 
-        MESSAGE_FOR_NEXT_AI + 
-        FORMAT_RULES + 
-        ANTI_TRUNCATION_RULES + 
-        WORK_RULES + 
-        HARD_RULES + 
+    val MEMORY_KNOWLEDGE: List<String> =
+        MESSAGE_FOR_NEXT_AI +
+        FORMAT_RULES +
+        ANTI_TRUNCATION_RULES +
+        WORK_RULES +
+        HARD_RULES +
         AI_HANDOVER_RULES
 
-    val ERROR_HISTORY: List<String> = 
-        FIXED_BUGS + 
+    val ERROR_HISTORY: List<String> =
+        FIXED_BUGS +
         BUILD_ERROR_HISTORY
 }
