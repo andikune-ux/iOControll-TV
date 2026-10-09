@@ -2,13 +2,7 @@ package dev.andikuneiocontroll.data
 
 /**
  * Memory Knowledge & Instruction — iOControll Tv
- *
- * WAJIB update setiap build kalau ada:
- * - Fitur baru
- * - Bug diperbaiki
- * - Error + solusi baru
- * - Perubahan struktur
- * - Aturan baru
+ * WAJIB update setiap build kalau ada fitur/bug/perubahan baru.
  */
 object AppKnowledge {
 
@@ -16,21 +10,20 @@ object AppKnowledge {
     const val PACKAGE_NAME = "dev.andikuneiocontroll"
     const val REPO_URL = "https://github.com/andikune-ux/iOControll-TV"
     const val REPO_ACTIONS = "https://github.com/andikune-ux/iOControll-TV/actions"
-    const val CURRENT_VERSION = "V1.00.000"
+    const val CURRENT_VERSION = "V1.00.002"
     const val WIFI_SERVER_PORT = 23016
+    const val TV_REMOTE_PORT = 6467
+    const val ADB_PORT = 5555
 
     // ==========================================
     // BAGIAN 2 — PENGATURAN USER (template statis)
     // ==========================================
     val SETTINGS_MENU: List<String> = listOf(
-        "1.  Lokasi & Waktu",
-        "2.  Pengaturan Tampilan",
-        "3.  Server WiFi (Transfer File)",
-        "4.  Remote TV",
-        "5.  Keamanan",
-        "6.  Backup Aman",
-        "7.  Tentang Aplikasi",
-        "8.  Opsi Developer"
+        "1.  Server WiFi (Transfer File)",
+        "2.  Remote TV (6 Protokol)",
+        "3.  Pengaturan Remote (haptic, sound, sensitivitas)",
+        "4.  Backup Aman",
+        "5.  Tentang Aplikasi"
     )
 
     // ==========================================
@@ -67,16 +60,15 @@ object AppKnowledge {
         "3. Bagian keystore di .github/workflows/build.yml",
         "",
         "ATURAN INSTALL APK:",
-        "- SELALU install dari GitHub Release",
+        "- SELALU install dari GitHub Actions Artifacts",
         "- JANGAN install APK dari AI Studio",
         "- Alasan: signature beda -> Android tolak -> bentrok",
         "",
         "=== BAGIAN 5 — PRINSIP UTAMA ===",
         "1. KERJAKAN PER BATCH",
-        "2. JANGAN BUKA FILE YANG SAMA BERKALI-KALI",
-        "3. KONFIRMASI SEBELUM LANJUT",
-        "4. JANGAN ASUMSI - LIHAT KODE ASLI DULU",
-        "5. JANGAN HAPUS FITUR LAMA TANPA IZIN"
+        "2. KONFIRMASI SEBELUM LANJUT",
+        "3. JANGAN ASUMSI - LIHAT KODE ASLI DULU",
+        "4. JANGAN HAPUS FITUR LAMA TANPA IZIN"
     )
 
     // ==========================================
@@ -84,38 +76,65 @@ object AppKnowledge {
     // ==========================================
     val FOLDER_STRUCTURE: List<String> = listOf(
         "app/src/main/java/dev/andikuneiocontroll/",
-        "├── MainActivity.kt",
-        "├── MainViewModel.kt",
-        "├── data/",
+        "├── MainActivity.kt          (flow Splash → Onboarding → Main)",
+        "├── MainViewModel.kt         (viewmodel utama)",
+        "├── data/local/              (Room + DataStore)",
+        "│   ├── TvEntity.kt          (entity TV terdaftar)",
+        "│   ├── TvDao.kt             (query database)",
+        "│   ├── TvDatabase.kt        (instance Room)",
+        "│   ├── TvRepository.kt      (wrapper akses)",
+        "│   └── PrefsRepository.kt   (DataStore pengaturan)",
+        "├── data/                    (knowledge & history)",
         "│   ├── AppKnowledge.kt",
         "│   └── UpdateHistory.kt",
-        "├── filemanager/",
+        "├── filemanager/             (helper file)",
         "│   └── FileManagerHelper.kt",
         "├── model/",
-        "│   └── Models.kt",
+        "│   └── Models.kt            (data class)",
         "├── remote/",
-        "│   ├── RemoteClient.kt",
-        "│   └── RemoteSocketServer.kt",
-        "├── server/",
-        "│   ├── DiscoveryManager.kt",
+        "│   ├── controller/",
+        "│   │   ├── RemoteController.kt      (facade 6 protokol)",
+        "│   │   └── RemoteControllers.kt     (Voice, Keyboard, Mouse, Cast, Shortcut)",
+        "│   ├── discovery/",
+        "│   │   ├── DiscoveredTv.kt",
+        "│   │   ├── MdnsDiscovery.kt",
+        "│   │   ├── SsdpDiscovery.kt",
+        "│   │   ├── TvDiscoveryManager.kt",
+        "│   │   └── TvFilter.kt",
+        "│   └── protocol/",
+        "│       ├── TvProtocol.kt            (interface)",
+        "│       ├── ProtocolDetector.kt",
+        "│       ├── adb/                     (ADB Wi-Fi)",
+        "│       │   ├── AdbProtocol.kt",
+        "│       │   ├── AdbCrypto.kt",
+        "│       │   ├── AdbClient.kt",
+        "│       │   └── AdbTvClient.kt",
+        "│       ├── roku/RokuEcpClient.kt",
+        "│       ├── samsung/SamsungTizenClient.kt",
+        "│       ├── lg/LgWebOsClient.kt",
+        "│       ├── philips/PhilipsClient.kt",
+        "│       └── vizio/VizioClient.kt",
+        "├── server/                  (WiFi file server)",
         "│   ├── WifiFileServerService.kt",
-        "│   └── WifiHttpServer.kt",
+        "│   ├── WifiHttpServer.kt",
+        "│   └── DiscoveryManager.kt",
         "├── ui/",
         "│   ├── MainScreen.kt",
-        "│   ├── components/",
-        "│   │   ├── MobileModeView.kt",
-        "│   │   └── RemoteTvDialog.kt",
-        "│   ├── filemanager/",
-        "│   │   ├── FilePaneView.kt",
-        "│   │   └── WifiShareDialog.kt",
-        "│   ├── permissions/",
-        "│   │   └── PermissionHandlerView.kt",
+        "│   ├── SplashAndOnboarding.kt",
         "│   ├── remote/",
-        "│   │   └── ConnectionPaneView.kt",
+        "│   │   ├── RemoteTvDialog.kt        (container UI remote)",
+        "│   │   ├── components/",
+        "│   │   │   ├── HapticHelper.kt",
+        "│   │   │   ├── RemoteButton.kt",
+        "│   │   │   ├── RemoteHeader.kt",
+        "│   │   │   ├── RemoteDPad.kt",
+        "│   │   │   ├── RemoteBars.kt        (TopBar, NavBar, MediaBar, VolumeBar, QuickBar)",
+        "│   │   │   └── RemoteModes.kt       (Grid, Mouse, Gesture, AirMouse)",
+        "│   │   ├── dialogs/TvDialogs.kt     (Picker, Pairing, Info, Input, Shortcut, ManualIp)",
+        "│   │   └── settings/RemoteSettingsScreen.kt",
+        "│   ├── filemanager/",
+        "│   ├── permissions/",
         "│   └── theme/",
-        "│       ├── Color.kt",
-        "│       ├── Theme.kt",
-        "│       └── Type.kt",
         "├── util/",
         "│   └── BackupHelper.kt",
         "└── viewers/",
@@ -127,37 +146,50 @@ object AppKnowledge {
     // ==========================================
     val FEATURE_LIST: List<String> = listOf(
         "1. TRANSFER FILE DUAL-PANE (X-plore Style)",
-        "   - 2 pane bersamaan di Mode TV",
-        "   - 1 pane di Mode HP dengan switch toolbar",
+        "   - 2 pane bersamaan di Mode TV, 1 pane di Mode HP",
         "   - Copy, Move, Rename, Delete, Compress, Extract",
-        "   - Auto-play video saat tap",
-        "   - Auto-play image viewer",
-        "   - Vault enkripsi",
-        "   - Disk Map",
+        "   - Auto-play video, image viewer, vault enkripsi, disk map",
         "",
         "2. SERVER WiFi (Port 23016)",
         "   - Auto-scan perangkat di WiFi yang sama",
-        "   - NSD/mDNS discovery",
-        "   - Popup dialog, bukan fullscreen",
-        "   - Read-only / full access mode",
+        "   - NSD/mDNS discovery untuk transfer file",
         "",
-        "3. REMOTE TV (Zank Remote Style)",
-        "   - D-Pad, Home, Back, Recent",
-        "   - Mouse touchpad",
-        "   - Keyboard input",
-        "   - Media control",
-        "   - Jendela baru full screen",
+        "3. REMOTE TV (6 PROTOKOL)",
+        "   - Protokol didukung:",
+        "     * ADB Wi-Fi (port 5555) — Android TV, Fire TV",
+        "     * Roku ECP (port 8060) — Roku TV",
+        "     * Samsung Tizen (port 8001/8002) — Samsung Smart TV",
+        "     * LG webOS SSAP (port 3000/3001) — LG Smart TV",
+        "     * Philips JointSpace (port 1925/1926) — Philips TV",
+        "     * Vizio SmartCast (port 9000) — Vizio TV",
+        "   - Auto-detect protokol via ProtocolDetector",
+        "   - Auto-scan mDNS + SSDP (bersamaan)",
+        "   - Manual IP fallback untuk TV yang tidak terdeteksi",
         "",
-        "4. UI ADAPTIF",
-        "   - Mode TV: 2 Pane + toolbar tengah vertikal",
-        "   - Mode HP: 1 Pane + toolbar dinamis (kiri/kanan)",
-        "   - Fullscreen: force rotasi ke landscape",
+        "4. UI REMOTE (5 MODE)",
+        "   - D-Pad (default)",
+        "   - Grid (angka 0-9 + RGBY)",
+        "   - Mouse (touchpad kursor)",
+        "   - Gesture (swipe = D-Pad virtual)",
+        "   - Air Mouse (gyroscope)",
         "",
-        "5. BACKUP AMAN",
-        "   - Ekspor 14 bagian ke TXT",
-        "   - Lokasi: /sdcard/IOremote TV/Backup Aman/",
+        "5. TOMBOL REMOTE LENGKAP",
+        "   - Top Bar: Voice, Input, Cast, Keyboard, Copy, TV List",
+        "   - Nav Bar: Home, Back, Recent, Mute",
+        "   - Media Bar: Play, Pause, Stop, Rew, Fwd, Prev, Next",
+        "   - Volume Bar: Vol+, Vol-, Ch+, Ch- (dengan gesture)",
+        "   - Quick Bar: 5 mode switcher + Shortcut + Exit",
         "",
-        "6. KEYSTORE PERMANEN",
+        "6. FITUR PENDUKUNG",
+        "   - Volume Monitor Overlay (tap + gesture)",
+        "   - Haptic Feedback (getar halus)",
+        "   - Pengaturan Remote (haptic, sound, sensitivitas, ukuran tombol)",
+        "   - Multi-TV Manager (simpan TV terdaftar di Room)",
+        "   - Auto-connect ke TV terakhir",
+        "   - Splash Screen + Onboarding 3 slide",
+        "   - Backup Aman (14 bagian)",
+        "",
+        "7. KEYSTORE PERMANEN",
         "   - Auto-generate di GitHub Actions build pertama",
         "   - Disimpan sebagai debug.keystore.base64",
         "   - Update APK tanpa uninstall"
@@ -167,41 +199,62 @@ object AppKnowledge {
     // BAGIAN 9 — RIWAYAT BUG DIPERBAIKI
     // ==========================================
     val FIXED_BUGS: List<String> = listOf(
-        "[09-10-2026] WifiFileServerService.kt terpotong 25 baris -> restorasi full class",
-        "[09-10-2026] Namespace com.example vs dev.andikuneiocontroll -> migrasi global",
-        "[09-10-2026] META-INF/INDEX.LIST duplicate dari Netty -> packaging excludes",
-        "[09-10-2026] Icon deprecated (Icons.Filled vs AutoMirrored) -> ganti AutoMirrored",
-        "[09-10-2026] Missing import height di RemoteTvDialog.kt -> tambah import",
-        "[09-10-2026] Keystore bentrok tiap build -> keystore permanen base64",
-        "[09-10-2026] Pane Kanan buka ConnectionPaneView -> ganti jadi FilePaneView",
-        "[09-10-2026] Toolbar Mode HP tidak dinamis -> MobileModeView dengan posisi adaptif",
-        "[09-10-2026] Panah switch pane tidak berubah arah -> panah dinamis",
-        "[09-10-2026] Dialog Server WiFi fullscreen -> popup kecil dengan auto-scan"
+        "[08-10-2026] WifiFileServerService.kt terpotong 25 baris -> restorasi full class",
+        "[08-10-2026] Namespace com.example vs dev.andikuneiocontroll -> migrasi global",
+        "[08-10-2026] META-INF/INDEX.LIST duplicate dari Netty -> packaging excludes",
+        "[08-10-2026] Icon deprecated (Icons.Filled vs AutoMirrored) -> ganti AutoMirrored",
+        "[08-10-2026] Missing import height di RemoteTvDialog.kt -> tambah import",
+        "[08-10-2026] Keystore bentrok tiap build -> keystore permanen base64",
+        "[08-10-2026] Pane Kanan buka ConnectionPaneView -> ganti jadi FilePaneView",
+        "[08-10-2026] Toolbar Mode HP tidak dinamis -> MobileModeView dengan posisi adaptif",
+        "[08-10-2026] Panah switch pane tidak berubah arah -> panah dinamis",
+        "[08-10-2026] Dialog Server WiFi fullscreen -> popup kecil dengan auto-scan",
+        "[09-10-2026] Conflicting overloads RemoteTopBar/RemoteNavBar -> hapus file lama",
+        "[09-10-2026] Unresolved KeyboardArrowUp/Down -> tambah import di RemoteBars",
+        "[09-10-2026] Delegate error MutableState<Long> -> pakai mutableLongStateOf",
+        "[09-10-2026] Unresolved weight di SizeButton -> RowScope extension",
+        "[09-10-2026] MainScreen masih pakai RemoteTvDialog lama -> ganti ke versi baru",
+        "[09-10-2026] Discovery tidak deteksi Google TV -> tambah Manual IP fallback"
     )
 
     // ==========================================
     // BAGIAN 10 — RIWAYAT ERROR + SOLUSI
     // ==========================================
     val ERROR_HISTORY: List<String> = listOf(
-        "[09-10-2026] - V1.00.000",
+        "[08-10-2026] - V1.00.001",
         "Error: Unresolved reference 'R' di WifiFileServerService",
         "File: app/src/main/java/com/example/server/WifiFileServerService.kt",
         "Solusi: Fix namespace, ganti com.example -> dev.andikuneiocontroll",
         "---",
-        "[09-10-2026] - V1.00.000",
+        "[08-10-2026] - V1.00.001",
         "Error: 12 files found with path 'META-INF/INDEX.LIST'",
         "File: app/build.gradle.kts",
         "Solusi: Tambah packaging.excludes untuk META-INF/*",
         "---",
-        "[09-10-2026] - V1.00.000",
+        "[08-10-2026] - V1.00.001",
         "Error: Aplikasi tidak diinstal karena paket ini bentrok",
         "File: debug.keystore.base64",
         "Solusi: Keystore permanen + uninstall APK lama sekali",
         "---",
-        "[09-10-2026] - V1.00.000",
-        "Error: Unresolved reference 'height' di RemoteTvDialog.kt",
-        "File: app/src/main/java/com/example/ui/components/RemoteTvDialog.kt",
-        "Solusi: Tambah import androidx.compose.foundation.layout.height"
+        "[09-10-2026] - V1.00.002",
+        "Error: Overload resolution ambiguity between candidates RemoteTopBar",
+        "File: app/src/main/java/com/example/ui/remote/RemoteTvDialog.kt",
+        "Solusi: Hapus file RemoteTopBar.kt + RemoteNavBar.kt lama (duplikat)",
+        "---",
+        "[09-10-2026] - V1.00.002",
+        "Error: Unresolved reference 'KeyboardArrowUp' di RemoteBars.kt",
+        "File: app/src/main/java/com/example/ui/remote/components/RemoteBars.kt",
+        "Solusi: Tambah import KeyboardArrowUp + KeyboardArrowDown",
+        "---",
+        "[09-10-2026] - V1.00.002",
+        "Error: Delegate error MutableState<Long> di RemoteModes.kt",
+        "File: app/src/main/java/com/example/ui/remote/components/RemoteModes.kt",
+        "Solusi: Pakai mutableLongStateOf, tambah import getValue/setValue",
+        "---",
+        "[09-10-2026] - V1.00.002",
+        "Error: Unresolved reference 'weight' di RemoteSettingsScreen.kt",
+        "File: app/src/main/java/com/example/ui/remote/settings/RemoteSettingsScreen.kt",
+        "Solusi: SizeButton jadi RowScope extension"
     )
 
     // ==========================================
@@ -212,13 +265,15 @@ object AppKnowledge {
         "2. JANGAN ubah signingConfigs di build.gradle.kts",
         "3. JANGAN ubah bagian keystore di build.yml",
         "4. Port WiFi server: 23016 (JANGAN diubah)",
-        "5. Package: dev.andikuneiocontroll (JANGAN diubah)",
-        "6. Install APK selalu dari GitHub Actions Artifacts",
-        "7. Backup Aman harus update setiap build kalau ada fitur/bug baru"
+        "5. Port TV Remote: 6467 (Android TV v2) / 5555 (ADB)",
+        "6. Package: dev.andikuneiocontroll (JANGAN diubah)",
+        "7. Install APK selalu dari GitHub Actions Artifacts",
+        "8. Backup Aman harus update setiap build kalau ada fitur/bug baru"
     )
 
     val BUILD_ERROR_HISTORY: List<String> = listOf(
         "Build #1-#11: Gagal berturut-turut (namespace, keystore, META-INF)",
-        "Build #36: SUKSES - keystore permanen + semua fix diterapkan"
+        "Build #36: SUKSES - keystore permanen + semua fix diterapkan",
+        "Build v1.00.002: SUKSES - 6 protokol + UI Remote + Manual IP"
     )
 }
