@@ -21,7 +21,7 @@ import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.ArrowForward
 import androidx.compose.material.icons.filled.Fullscreen
 import androidx.compose.material.icons.filled.Settings
-import androidx.compose.material.icons.filled.Tv
+import androidx.compose.material.icons.filled.SettingsRemote
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.runtime.Composable
@@ -45,6 +45,7 @@ fun MobileModeView(
     isLeftPaneVisible: Boolean,
     onTogglePane: () -> Unit,
     onOpenSettings: () -> Unit,
+    onOpenRemote: () -> Unit,
     onOpenConnectionDialog: () -> Unit,
     isConnected: Boolean,
     paneContent: @Composable () -> Unit
@@ -62,12 +63,12 @@ fun MobileModeView(
                 onFullscreen = {
                     activity?.requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE
                 },
+                onOpenRemote = onOpenRemote,
                 onOpenConnectionDialog = onOpenConnectionDialog,
                 isConnected = isConnected
             )
         }
 
-        // Konten Pane
         Box(modifier = Modifier.weight(1f)) {
             paneContent()
         }
@@ -81,6 +82,7 @@ fun MobileModeView(
                 onFullscreen = {
                     activity?.requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE
                 },
+                onOpenRemote = onOpenRemote,
                 onOpenConnectionDialog = onOpenConnectionDialog,
                 isConnected = isConnected
             )
@@ -94,6 +96,7 @@ private fun MobileToolbar(
     onOpenSettings: () -> Unit,
     onTogglePane: () -> Unit,
     onFullscreen: () -> Unit,
+    onOpenRemote: () -> Unit,
     onOpenConnectionDialog: () -> Unit,
     isConnected: Boolean
 ) {
@@ -106,7 +109,7 @@ private fun MobileToolbar(
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.Center
     ) {
-        // Gerigi
+        // Gerigi -> Pengaturan
         IconButton(onClick = onOpenSettings) {
             Icon(
                 Icons.Default.Settings,
@@ -118,7 +121,7 @@ private fun MobileToolbar(
 
         Spacer(modifier = Modifier.height(18.dp))
 
-        // Panah DINAMIS: Pane Kiri aktif -> panah kanan, Pane Kanan aktif -> panah kiri
+        // Panah Switch Pane
         IconButton(onClick = onTogglePane) {
             Icon(
                 imageVector = if (isLeftPaneVisible) {
@@ -134,7 +137,7 @@ private fun MobileToolbar(
 
         Spacer(modifier = Modifier.height(18.dp))
 
-        // Fullscreen
+        // Fullscreen -> Paksa Landscape
         IconButton(onClick = onFullscreen) {
             Icon(
                 Icons.Default.Fullscreen,
@@ -170,13 +173,13 @@ private fun MobileToolbar(
 
         Spacer(modifier = Modifier.height(18.dp))
 
-        // Remote
-        IconButton(onClick = onOpenConnectionDialog) {
+        // Remote TV -> Buka jendela remote
+        IconButton(onClick = onOpenRemote) {
             Icon(
-                Icons.Default.Tv,
-                contentDescription = "Remote Control",
+                Icons.Default.SettingsRemote,
+                contentDescription = "Remote TV",
                 tint = StabiloPink,
-                modifier = Modifier.size(24.dp)
+                modifier = Modifier.size(26.dp)
             )
         }
     }
