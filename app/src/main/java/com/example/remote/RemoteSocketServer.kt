@@ -2,7 +2,6 @@ package dev.andikuneiocontroll.remote
 
 import android.content.Context
 import android.media.AudioManager
-import android.view.KeyEvent
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -16,18 +15,24 @@ import java.io.InputStreamReader
 import java.io.PrintWriter
 import java.net.ServerSocket
 import java.net.Socket
-import kotlin.random.Random
 
 data class TvReceiverState(
     val isRunning: Boolean = false,
     val port: Int = 23017,
-    val pairingCode: String = "1234",
     val connectedClient: String? = null,
     val lastCommand: String = "",
     val cursorX: Float = 960f,
     val cursorY: Float = 540f
 )
 
+/**
+ * RemoteSocketServer — Server di TV.
+ *
+ * V1.00.001 (Updated):
+ * - Hapus pairing code (auto-accept, sesuai Zank Remote)
+ * - Auto-start UDP listener via RemoteDiscovery
+ * - Setiap client yang connect langsung dianggap terhubung
+ */
 class RemoteSocketServer(
     private val context: Context,
     private val scope: CoroutineScope
@@ -35,23 +40,26 @@ class RemoteSocketServer(
     private var serverSocket: ServerSocket? = null
     private var serverJob: Job? = null
 
-    private val _receiverState = MutableStateFlow(
-        TvReceiverState(pairingCode = String.format("%04d", Random.nextInt(1000, 9999)))
-    )
+    // Discovery (UDP listener)
+    val discovery = RemoteDiscovery(context, scope)
+
+    private val _receiverState = MutableStateFlow(TvReceiverState())
     val receiverState: StateFlow<TvReceiverState> = _receiverState
 
-    private val audioManager = context.getSystemService(Context.AUDIO_SERVICE) as? AudioManager
+    private val audioManager =
+        context.getSystemService(Context.AUDIO_SERVICE) as? AudioManager
 
     fun startServer(port: Int = 23017) {
         if (serverSocket != null) return
 
-        val code = String.format("%04d", Random.nextInt(1000, 9999))
         _receiverState.value = _receiverState.value.copy(
             isRunning = true,
             port = port,
-            pairingCode = code,
             connectedClient = null
         )
+
+        // Mulai UDP listener untuk auto-discovery
+        discovery.startListener(remotePort = port)
 
         serverJob = scope.launch(Dispatchers.IO) {
             try {
@@ -64,7 +72,7 @@ class RemoteSocketServer(
                         launch(Dispatchers.IO) {
                             handleClient(client)
                         }
-                    } catch (e: Exception) {
+                    } catch (_: Exception) {
                         // Server closed
                     }
                 }
@@ -83,7 +91,11 @@ class RemoteSocketServer(
             serverSocket = null
             serverJob?.cancel()
             serverJob = null
-            _receiverState.value = _receiverState.value.copy(isRunning = false, connectedClient = null)
+            discovery.stopListener()
+            _receiverState.value = _receiverState.value.copy(
+                isRunning = false,
+                connectedClient = null
+            )
         } catch (e: Exception) {
             e.printStackTrace()
         }
@@ -95,29 +107,15 @@ class RemoteSocketServer(
             val reader = BufferedReader(InputStreamReader(socket.getInputStream()))
             val writer = PrintWriter(socket.getOutputStream(), true)
 
-            var isAuthenticated = false
+            // Auto-accept: langsung dianggap terhubung (tanpa pairing)
+            _receiverState.value = _receiverState.value.copy(connectedClient = clientAddress)
+            writer.println("CONNECT_OK")
 
             while (socket.isConnected && !socket.isClosed) {
                 val line = reader.readLine() ?: break
                 val parts = line.split("|")
+                if (parts.isEmpty()) continue
                 val cmd = parts[0]
-
-                if (cmd == "PAIR") {
-                    val candidateCode = if (parts.size > 1) parts[1] else ""
-                    if (candidateCode == _receiverState.value.pairingCode) {
-                        isAuthenticated = true
-                        _receiverState.value = _receiverState.value.copy(connectedClient = clientAddress)
-                        writer.println("PAIR_OK")
-                    } else {
-                        writer.println("PAIR_FAILED")
-                    }
-                    continue
-                }
-
-                if (!isAuthenticated) {
-                    writer.println("UNAUTHORIZED")
-                    continue
-                }
 
                 executeCommand(cmd, parts)
                 writer.println("OK")
@@ -159,32 +157,27 @@ class RemoteSocketServer(
                     _receiverState.value = cur.copy(cursorX = newX, cursorY = newY)
                 }
             }
+
             "MOUSE_CLICK" -> {
                 val cur = _receiverState.value
                 accessibility?.triggerClick(cur.cursorX, cur.cursorY)
             }
 
-            "VOLUME_UP" -> {
-                audioManager?.adjustStreamVolume(
-                    AudioManager.STREAM_MUSIC,
-                    AudioManager.ADJUST_RAISE,
-                    AudioManager.FLAG_SHOW_UI
-                )
-            }
-            "VOLUME_DOWN" -> {
-                audioManager?.adjustStreamVolume(
-                    AudioManager.STREAM_MUSIC,
-                    AudioManager.ADJUST_LOWER,
-                    AudioManager.FLAG_SHOW_UI
-                )
-            }
-            "MUTE" -> {
-                audioManager?.adjustStreamVolume(
-                    AudioManager.STREAM_MUSIC,
-                    AudioManager.ADJUST_TOGGLE_MUTE,
-                    AudioManager.FLAG_SHOW_UI
-                )
-            }
+            "VOLUME_UP" -> audioManager?.adjustStreamVolume(
+                AudioManager.STREAM_MUSIC,
+                AudioManager.ADJUST_RAISE,
+                AudioManager.FLAG_SHOW_UI
+            )
+            "VOLUME_DOWN" -> audioManager?.adjustStreamVolume(
+                AudioManager.STREAM_MUSIC,
+                AudioManager.ADJUST_LOWER,
+                AudioManager.FLAG_SHOW_UI
+            )
+            "MUTE" -> audioManager?.adjustStreamVolume(
+                AudioManager.STREAM_MUSIC,
+                AudioManager.ADJUST_TOGGLE_MUTE,
+                AudioManager.FLAG_SHOW_UI
+            )
 
             "INPUT_TEXT" -> {
                 if (parts.size >= 2) {
