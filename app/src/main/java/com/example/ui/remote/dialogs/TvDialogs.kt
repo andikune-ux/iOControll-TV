@@ -536,3 +536,132 @@ fun ShortcutDialog(
         }
     }
 }
+// ==========================================================
+// 6. MANUAL IP DIALOG (untuk TV yang tidak terdeteksi)
+// ==========================================================
+@Composable
+fun ManualIpDialog(
+    onSubmit: (String, Int) -> Unit,
+    onDismiss: () -> Unit
+) {
+    var ipInput by remember { mutableStateOf("192.168.") }
+    var portInput by remember { mutableStateOf("6467") }
+    var errorMessage by remember { mutableStateOf("") }
+
+    Dialog(onDismissRequest = onDismiss) {
+        Card(
+            modifier = Modifier.fillMaxWidth(0.92f).padding(16.dp),
+            colors = CardDefaults.cardColors(containerColor = DarkBgCard),
+            border = androidx.compose.foundation.BorderStroke(1.dp, StabiloCyan.copy(alpha = 0.5f)),
+            shape = RoundedCornerShape(18.dp)
+        ) {
+            Column(modifier = Modifier.padding(20.dp)) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Icon(Icons.Default.Link, null, tint = StabiloCyan, modifier = Modifier.size(22.dp))
+                    Spacer(modifier = Modifier.width(10.dp))
+                    Text(
+                        "Hubungkan via IP Manual",
+                        color = StabiloCyan,
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 16.sp
+                    )
+                    Spacer(modifier = Modifier.weight(1f))
+                    IconButton(onClick = onDismiss) {
+                        Icon(Icons.Default.Close, "Tutup", tint = TextSecondary)
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(12.dp))
+
+                Text(
+                    "Masukkan IP Address TV Anda.\nCek di: Setelan TV → Jaringan → Status.",
+                    color = TextSecondary,
+                    fontSize = 11.sp,
+                    lineHeight = 16.sp
+                )
+
+                Spacer(modifier = Modifier.height(16.dp))
+
+                OutlinedTextField(
+                    value = ipInput,
+                    onValueChange = {
+                        ipInput = it
+                        errorMessage = ""
+                    },
+                    label = { Text("IP Address TV") },
+                    placeholder = { Text("Contoh: 192.168.0.103") },
+                    singleLine = true,
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                    colors = OutlinedTextFieldDefaults.colors(
+                        focusedBorderColor = StabiloCyan,
+                        focusedLabelColor = StabiloCyan,
+                        cursorColor = StabiloCyan
+                    ),
+                    modifier = Modifier.fillMaxWidth()
+                )
+
+                Spacer(modifier = Modifier.height(8.dp))
+
+                OutlinedTextField(
+                    value = portInput,
+                    onValueChange = {
+                        portInput = it
+                        errorMessage = ""
+                    },
+                    label = { Text("Port (default: 6467)") },
+                    singleLine = true,
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                    colors = OutlinedTextFieldDefaults.colors(
+                        focusedBorderColor = StabiloLime,
+                        focusedLabelColor = StabiloLime,
+                        cursorColor = StabiloLime
+                    ),
+                    modifier = Modifier.fillMaxWidth()
+                )
+
+                if (errorMessage.isNotBlank()) {
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Text(
+                        errorMessage,
+                        color = StabiloPink,
+                        fontSize = 11.sp
+                    )
+                }
+
+                Spacer(modifier = Modifier.height(16.dp))
+
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    Button(
+                        onClick = onDismiss,
+                        colors = ButtonDefaults.buttonColors(containerColor = DarkBgCardElevated),
+                        shape = RoundedCornerShape(10.dp),
+                        modifier = Modifier.weight(1f).height(46.dp)
+                    ) {
+                        Text("Batal", color = TextPrimary)
+                    }
+
+                    Button(
+                        onClick = {
+                            val ip = ipInput.trim()
+                            val port = portInput.trim().toIntOrNull() ?: 6467
+                            // Validasi IP sederhana
+                            if (ip.count { it == '.' } != 3 || ip.endsWith(".")) {
+                                errorMessage = "Format IP tidak valid"
+                            } else {
+                                onSubmit(ip, port)
+                            }
+                        },
+                        colors = ButtonDefaults.buttonColors(containerColor = StabiloCyan),
+                        shape = RoundedCornerShape(10.dp),
+                        modifier = Modifier.weight(1f).height(46.dp)
+                    ) {
+                        Text("Hubungkan", color = Color.Black, fontWeight = FontWeight.Bold)
+                    }
+                }
+            }
+        }
+    }
+}
