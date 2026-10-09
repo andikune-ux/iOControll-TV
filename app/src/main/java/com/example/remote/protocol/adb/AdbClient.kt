@@ -10,22 +10,20 @@ import java.net.Socket
 import java.util.concurrent.atomic.AtomicInteger
 
 /**
- * AdbClient — client koneksi ADB ke TV Android.
+ * AdbClient — Client koneksi ADB ke TV Android.
  *
- * Alur koneksi:
- * 1. Connect socket ke TV:5555
- * 2. Kirim CNXN (connect) + public key
- * 3. Kalau TV belum recognize key → TV kirim AUTH TOKEN
- * 4. Sign token dengan RSA → kirim AUTH SIGNATURE
- * 5. TV accept → kirim CNXN balik
- * 6. Kirim OPEN "shell:..." → dapat OKAY
- * 7. Kirim WRTE dengan command → baca response
+ * V2 (Update):
+ * - Support Wireless Debugging pairing (Android 11+)
+ * - Auto-detect: kalau belum paired → minta pairing dulu
+ * - Kalau sudah paired → langsung connect
  *
- * Setelah terhubung, kita bisa kirim perintah shell seperti:
- * - "input keyevent KEYCODE_DPAD_UP"
- * - "input keyevent KEYCODE_HOME"
- * - "am start -a android.intent.action.VIEW ..."
- * - "input text 'hello'"
+ * Alur:
+ * 1. Cek isPaired(host) → kalau belum, user harus pairing
+ * 2. Pairing: buka AdbPairing.pair() dengan code 6 digit
+ * 3. Connect: buka socket ke port 5555 (atau custom)
+ * 4. Handshake: kirim CNXN + public key
+ * 5. Kalau TV belum recognize key → kirim AUTH
+ * 6. Kirim command via OPEN + WRTE
  */
 class AdbClient(private val context: Context) {
 
@@ -44,14 +42,33 @@ class AdbClient(private val context: Context) {
         private set
 
     /**
-     * Connect ke TV. Return (sukses, pesan).
+     * Cek apakah host sudah pernah di-pair.
+     */
+    fun isPaired(host: String): Boolean {
+        return AdbPairing.isPaired(context, host)
+    }
+
+    /**
+     * Pair ke TV (sekali saja).
+     * Setelah sukses, connect() bisa dipanggil.
+     */
+    suspend fun pair(
+        host: String,
+        pairingPort: Int,
+        pairingCode: String
+    ): Pair<Boolean, String> {
+        return AdbPairing.pair(context, host, pairingPort, pairingCode)
+    }
+
+    /**
+     * Connect ke TV (setelah pairing, atau kalau sudah pernah connect).
      */
     suspend fun connect(ip: String, port: Int = AdbProtocol.DEFAULT_PORT): Pair<Boolean, String> {
         return withContext(Dispatchers.IO) {
             try {
                 disconnect()
 
-                // 1. Connect socket
+                // Connect socket
                 val s = Socket()
                 s.connect(InetSocketAddress(ip, port), 5000)
                 s.tcpNoDelay = true
@@ -60,14 +77,14 @@ class AdbClient(private val context: Context) {
                 input = DataInputStream(s.getInputStream())
                 output = DataOutputStream(s.getOutputStream())
 
-                // 2. Kirim CNXN
+                // Kirim CNXN dengan public key
                 val keyPair = AdbCrypto.getOrCreateKeyPair(context)
                 val publicKey = AdbCrypto.getAdbPublicKey(keyPair)
                 val cnxn = AdbProtocol.buildCnxn(publicKey)
                 output?.write(cnxn)
                 output?.flush()
 
-                // 3. Tunggu balasan (loop sampai CNXN atau AUTH)
+                // Tunggu balasan (CNXN = sukses, AUTH = butuh signature)
                 var authenticated = false
                 var connected = false
                 var attempts = 0
@@ -97,7 +114,6 @@ class AdbClient(private val context: Context) {
 
                     when (header.command) {
                         AdbProtocol.CMD_CNXN -> {
-                            // TV accept
                             connected = true
                         }
 
@@ -122,9 +138,7 @@ class AdbClient(private val context: Context) {
                             }
                         }
 
-                        else -> {
-                            // Command lain saat handshake — abaikan
-                        }
+                        else -> {}
                     }
                 }
 
@@ -139,7 +153,7 @@ class AdbClient(private val context: Context) {
                 true to "Terhubung ke TV ($ip:$port)"
 
             } catch (e: java.net.SocketTimeoutException) {
-                lastError = "Timeout: TV tidak merespons. Pastikan ADB Debugging aktif & TV di WiFi sama."
+                lastError = "Timeout: TV tidak merespons. Pastikan Wireless Debugging aktif."
                 disconnect()
                 false to lastError
             } catch (e: java.net.ConnectException) {
@@ -156,7 +170,6 @@ class AdbClient(private val context: Context) {
 
     /**
      * Kirim perintah shell ADB.
-     * Contoh: sendShell("input keyevent KEYCODE_HOME")
      */
     suspend fun sendShell(command: String): Pair<Boolean, String> {
         return withContext(Dispatchers.IO) {
@@ -167,12 +180,12 @@ class AdbClient(private val context: Context) {
 
                 val localId = localIdCounter.getAndIncrement()
 
-                // 1. OPEN shell
+                // OPEN shell
                 val openMsg = AdbProtocol.buildOpen(localId, "shell:$command")
                 output?.write(openMsg)
                 output?.flush()
 
-                // 2. Tunggu OKAY dari TV
+                // Tunggu OKAY
                 var remoteId = -1
                 var okayReceived = false
                 var loops = 0
@@ -199,14 +212,11 @@ class AdbClient(private val context: Context) {
                             return@withContext false to "TV menolak perintah (CLSE)"
                         }
                         AdbProtocol.CMD_WRTE -> {
-                            // Output dari command sebelumnya — kirim OKAY
                             val okay = AdbProtocol.buildOkay(localId, header.arg0)
                             output?.write(okay)
                             output?.flush()
                         }
-                        AdbProtocol.CMD_CNXN -> {
-                            // Ping dari TV — abaikan
-                        }
+                        AdbProtocol.CMD_CNXN -> {}
                     }
                 }
 
@@ -214,12 +224,11 @@ class AdbClient(private val context: Context) {
                     return@withContext false to "TV tidak merespons perintah"
                 }
 
-                // 3. Kirim OKAY untuk acknowledge
+                // ACK + CLOSE
                 val okayAck = AdbProtocol.buildOkay(localId, remoteId)
                 output?.write(okayAck)
                 output?.flush()
 
-                // 4. Kirim CLSE untuk close session
                 val closeMsg = AdbProtocol.buildClose(localId, remoteId)
                 output?.write(closeMsg)
                 output?.flush()
@@ -250,7 +259,7 @@ class AdbClient(private val context: Context) {
     }
 
     /**
-     * Cek masih terkoneksi dengan ping (kirim command kosong).
+     * Ping TV (cek masih hidup).
      */
     suspend fun ping(): Boolean {
         if (!isConnected) return false
