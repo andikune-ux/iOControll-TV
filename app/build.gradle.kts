@@ -14,7 +14,7 @@ android {
         minSdk = 24
         targetSdk = 34
         versionCode = 1
-        versionName = "V1.00.001"
+        versionName = "V1.00.002"
         vectorDrawables { useSupportLibrary = true }
 
         ksp {
@@ -108,23 +108,17 @@ dependencies {
     // Accompanist
     implementation(libs.accompanist.permissions)
 
-    // ==== REMOTE TV ====
-
-    // OkHttp (WebSocket Samsung, LG, Roku)
+    // ==== REMOTE TV — CORE ====
     implementation(libs.okhttp)
-
-    // Moshi (JSON)
+    implementation(libs.okhttp.tls)
     implementation(libs.moshi)
     implementation(libs.moshi.kotlin)
-
-    // Room (Database TV)
     implementation(libs.room.runtime)
     implementation(libs.room.ktx)
     ksp(libs.room.compiler)
-
-    // mDNS
     implementation(libs.jmdns)
-
-    // DataStore
     implementation(libs.androidx.datastore.preferences)
+
+    // ==== REMOTE TV — PROTOKOL ====
+    implementation(libs.protobuf.javalite)
 }
