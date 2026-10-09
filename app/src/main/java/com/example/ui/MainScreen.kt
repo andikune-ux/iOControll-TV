@@ -180,7 +180,9 @@ fun MainScreen(viewModel: MainViewModel) {
             viewModel.scanTvs()
         }
     }
-Scaffold(
+
+
+    Scaffold(
     modifier = Modifier.fillMaxSize(),
     containerColor = DarkBgPrimary,
     bottomBar = {
@@ -208,7 +210,6 @@ Scaffold(
             .padding(innerPadding)
     ) {
         if (isLandscape) {
-            // ============ MODE TV (LANDSCAPE) - 2 PANE ============
             Box(modifier = Modifier.fillMaxSize()) {
                 Row(modifier = Modifier.fillMaxSize()) {
                     Box(modifier = Modifier.weight(1f)) {
@@ -353,7 +354,6 @@ Scaffold(
                 }
             }
         } else {
-            // ============ MODE HP (PORTRAIT) ============
             MobileModeView(
                 isLeftPaneVisible = isLeftPaneVisible,
                 onTogglePane = { isLeftPaneVisible = !isLeftPaneVisible },
@@ -417,8 +417,10 @@ Scaffold(
             )
         }
     }
-}
-    // ==========================================================
+    }
+
+
+        // ==========================================================
     // SEMUA DIALOG & OVERLAY
     // ==========================================================
 
@@ -445,7 +447,8 @@ Scaffold(
             onOpenCast = {
                 Toast.makeText(context, "Screen Cast akan segera hadir", Toast.LENGTH_SHORT).show()
             },
-            onOpenShortcut = { showShortcutDialog = true }
+            onOpenShortcut = { showShortcutDialog = true },
+            onOpenInfoTv = { showInfoTvDialog = true }
         )
     }
 
@@ -868,3 +871,5 @@ fun StabiloLauncherDialog(
         }
     }
 }
+
+
