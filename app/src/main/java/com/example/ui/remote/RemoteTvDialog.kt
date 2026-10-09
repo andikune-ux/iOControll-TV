@@ -7,17 +7,13 @@ import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.background
 import androidx.compose.foundation.gestures.detectDragGestures
-import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -25,7 +21,6 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
-import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -63,20 +58,6 @@ import dev.andikuneiocontroll.ui.theme.StabiloLime
 import dev.andikuneiocontroll.ui.theme.TextPrimary
 import kotlinx.coroutines.launch
 
-/**
- * RemoteTvDialog — Container utama UI remote.
- *
- * Layout:
- * - Header (Back, Nama TV, Settings, Power)
- * - TopBar (Voice, Input, Cast, Kbd, Copy, TV)
- * - Area Kontrol (berubah sesuai mode: D-Pad / Grid / Mouse / Gesture / Air)
- * - NavBar (Home, Back, Recent, Mute)
- * - MediaBar (Play, Pause, Rew, Fwd, dll)
- * - VolumeBar (Vol+, Vol-, Ch+, Ch-)
- * - QuickBar (mode switcher + Shortcut + Exit)
- *
- * Volume Monitor Overlay muncul saat tombol Vol ditahan + gesture.
- */
 @Composable
 fun RemoteTvDialog(
     remoteController: RemoteController,
@@ -87,7 +68,9 @@ fun RemoteTvDialog(
     onOpenKeyboard: () -> Unit = {},
     onOpenCast: () -> Unit = {},
     onOpenShortcut: () -> Unit = {},
-    onOpenInfoTv: () -> Unit = {}
+    onOpenInfoTv: () -> Unit = {},
+    onOpenVoice: () -> Unit = {},
+    onOpenCopy: () -> Unit = {}
 ) {
     val context = LocalContext.current
     val activity = context as? Activity
@@ -95,12 +78,10 @@ fun RemoteTvDialog(
 
     val connectionState by remoteController.connectionState.collectAsState()
 
-    // State
     var currentMode by remember { mutableStateOf(RemoteMode.DPAD) }
     var volumeMonitorVisible by remember { mutableStateOf(false) }
-    var volumeLevel by remember { mutableStateOf(50) }  // 0-100
+    var volumeLevel by remember { mutableStateOf(50) }
 
-    // Paksa orientasi Portrait saat dialog dibuka
     DisposableEffect(Unit) {
         val original = activity?.requestedOrientation
         activity?.requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_PORTRAIT
@@ -109,7 +90,6 @@ fun RemoteTvDialog(
         }
     }
 
-    // Helper: kirim command
     fun send(cmd: String, payload: String = "") {
         scope.launch { remoteController.sendCommand(cmd, payload) }
     }
@@ -132,30 +112,28 @@ fun RemoteTvDialog(
                     .fillMaxSize()
                     .verticalScroll(rememberScrollState())
             ) {
-                // Header
                 RemoteHeader(
-    tvName = connectionState.tv?.displayName ?: "Belum Terhubung",
-    protocolName = connectionState.protocolName,
-    isConnected = connectionState.isConnected,
-    latencyMs = 0,
-    onBack = onDismiss,
-    onNameClick = onOpenInfoTv,
-    onSettings = onOpenSettings,
-    onPower = { send(TvCommand.POWER) }
-)
-                // Top Bar
+                    tvName = connectionState.tv?.displayName ?: "Belum Terhubung",
+                    protocolName = connectionState.protocolName,
+                    isConnected = connectionState.isConnected,
+                    latencyMs = 0,
+                    onBack = onDismiss,
+                    onNameClick = onOpenInfoTv,
+                    onSettings = onOpenSettings,
+                    onPower = { send(TvCommand.POWER) }
+                )
+
                 RemoteTopBar(
-                    onVoice = { send(TvCommand.VOICE_START) },
+                    onVoice = onOpenVoice,
                     onInput = onOpenInputSource,
                     onCast = onOpenCast,
                     onKeyboard = onOpenKeyboard,
-                    onCopy = { /* TODO copy */ },
+                    onCopy = onOpenCopy,
                     onTvList = onOpenTvList
                 )
 
                 Spacer(modifier = Modifier.height(8.dp))
 
-                // ============ AREA KONTROL (per mode) ============
                 Box(
                     modifier = Modifier
                         .fillMaxWidth()
@@ -211,7 +189,6 @@ fun RemoteTvDialog(
 
                 Spacer(modifier = Modifier.height(12.dp))
 
-                // Nav Bar (Home, Back, Recent, Mute)
                 RemoteNavBar(
                     onHome = { send(TvCommand.HOME) },
                     onBack = { send(TvCommand.BACK) },
@@ -219,7 +196,6 @@ fun RemoteTvDialog(
                     onMute = { send(TvCommand.VOLUME_MUTE) }
                 )
 
-                // Media Bar
                 RemoteMediaBar(
                     onPlay = { send(TvCommand.PLAY) },
                     onPause = { send(TvCommand.PAUSE) },
@@ -230,7 +206,6 @@ fun RemoteTvDialog(
                     onNext = { send(TvCommand.NEXT) }
                 )
 
-                // Volume + Channel Bar
                 RemoteVolumeBar(
                     onVolUpTap = {
                         send(TvCommand.VOLUME_UP)
@@ -248,7 +223,6 @@ fun RemoteTvDialog(
                     onChannelDown = { send(TvCommand.CHANNEL_DOWN) }
                 )
 
-                // Quick Bar (mode switcher + shortcut + exit)
                 RemoteQuickBar(
                     activeMode = currentMode,
                     onModeChanged = { currentMode = it },
@@ -259,7 +233,6 @@ fun RemoteTvDialog(
                 Spacer(modifier = Modifier.height(16.dp))
             }
 
-            // Volume Monitor Overlay (muncul saat vol ditahan)
             AnimatedVisibility(
                 visible = volumeMonitorVisible,
                 enter = fadeIn(),
@@ -283,10 +256,6 @@ fun RemoteTvDialog(
     }
 }
 
-/**
- * VolumeMonitorOverlay — overlay monitor volume di tengah layar.
- * Muncul saat tombol Vol ditahan & user swipe.
- */
 @Composable
 private fun VolumeMonitorOverlay(
     level: Int,
@@ -305,7 +274,6 @@ private fun VolumeMonitorOverlay(
                     onDrag = { change, dragAmount ->
                         change.consume()
                         accumulatedDx += dragAmount.x
-                        // Setiap 10px gerakan = 1% volume
                         val delta = (accumulatedDx / 10f).toInt()
                         if (delta != 0) {
                             val newLevel = (level + delta).coerceIn(0, 100)
@@ -327,13 +295,8 @@ private fun VolumeMonitorOverlay(
                 .padding(28.dp),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
-            Text(
-                text = "🔊",
-                fontSize = 48.sp
-            )
-
+            Text(text = "🔊", fontSize = 48.sp)
             Spacer(modifier = Modifier.height(8.dp))
-
             Text(
                 text = "VOLUME",
                 color = StabiloCyan,
@@ -341,19 +304,14 @@ private fun VolumeMonitorOverlay(
                 fontWeight = FontWeight.Bold,
                 letterSpacing = 2.sp
             )
-
             Spacer(modifier = Modifier.height(12.dp))
-
             Text(
                 text = "$level%",
                 color = StabiloLime,
                 fontSize = 40.sp,
                 fontWeight = FontWeight.ExtraBold
             )
-
             Spacer(modifier = Modifier.height(16.dp))
-
-            // Progress bar
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -369,9 +327,7 @@ private fun VolumeMonitorOverlay(
                         .background(StabiloLime)
                 )
             }
-
             Spacer(modifier = Modifier.height(16.dp))
-
             Text(
                 text = "← Geser kiri = turun\n→ Geser kanan = naik",
                 color = TextPrimary.copy(alpha = 0.6f),
