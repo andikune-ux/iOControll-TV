@@ -4,7 +4,6 @@ import android.app.Activity
 import android.content.pm.ActivityInfo
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -21,7 +20,6 @@ import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.ArrowForward
 import androidx.compose.material.icons.filled.Fullscreen
 import androidx.compose.material.icons.filled.Settings
-import androidx.compose.material.icons.filled.SettingsRemote
 import androidx.compose.material.icons.filled.Wifi
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -37,9 +35,7 @@ import dev.andikuneiocontroll.ui.theme.DarkBgCardElevated
 import dev.andikuneiocontroll.ui.theme.DarkDivider
 import dev.andikuneiocontroll.ui.theme.StabiloCyan
 import dev.andikuneiocontroll.ui.theme.StabiloLime
-import dev.andikuneiocontroll.ui.theme.StabiloPink
 import dev.andikuneiocontroll.ui.theme.StabiloYellow
-import dev.andikuneiocontroll.ui.theme.TextMuted
 
 @Composable
 fun MobileModeView(
@@ -108,78 +104,58 @@ private fun MobileToolbar(
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.Center
     ) {
-        // Gerigi -> Pengaturan (Backup Aman)
-        IconButton(onClick = onOpenSettings) {
-            Icon(
-                Icons.Default.Settings,
-                contentDescription = "Pengaturan",
-                tint = StabiloCyan,
-                modifier = Modifier.size(24.dp)
-            )
-        }
+        // Gerigi -> Pengaturan (dengan tooltip)
+        StabiloTooltipButton(
+            icon = Icons.Default.Settings,
+            tooltip = "Pengaturan",
+            tint = StabiloCyan,
+            onClick = onOpenSettings
+        )
 
         Spacer(modifier = Modifier.height(16.dp))
 
-        // Panah Switch Pane
-        IconButton(onClick = onTogglePane) {
-            Icon(
-                imageVector = if (isLeftPaneVisible) {
-                    Icons.AutoMirrored.Filled.ArrowForward
-                } else {
-                    Icons.AutoMirrored.Filled.ArrowBack
-                },
-                contentDescription = if (isLeftPaneVisible) "Ke Pane Kanan" else "Ke Pane Kiri",
-                tint = StabiloLime,
-                modifier = Modifier.size(28.dp)
-            )
-        }
+        // Panah Switch Pane (dengan tooltip)
+        StabiloTooltipButton(
+            icon = if (isLeftPaneVisible) {
+                Icons.AutoMirrored.Filled.ArrowForward
+            } else {
+                Icons.AutoMirrored.Filled.ArrowBack
+            },
+            tooltip = if (isLeftPaneVisible) "Ke Pane Kanan" else "Ke Pane Kiri",
+            tint = StabiloLime,
+            onClick = onTogglePane
+        )
 
         Spacer(modifier = Modifier.height(16.dp))
 
-        // Fullscreen -> Paksa Landscape
-        IconButton(onClick = onFullscreen) {
-            Icon(
-                Icons.Default.Fullscreen,
-                contentDescription = "Paksa Rotasi ke TV",
-                tint = StabiloYellow,
-                modifier = Modifier.size(28.dp)
-            )
-        }
+        // Fullscreen (dengan tooltip)
+        StabiloTooltipButton(
+            icon = Icons.Default.Fullscreen,
+            tooltip = "Mode TV",
+            tint = StabiloYellow,
+            onClick = onFullscreen
+        )
 
         Spacer(modifier = Modifier.height(16.dp))
 
-        // Dot Status Koneksi -> BUKA SERVER WIFI
-        Box(
-            modifier = Modifier
-                .size(38.dp)
-                .clip(CircleShape)
-                .background(DarkBgCardElevated)
-                .border(
-                    1.5.dp,
-                    if (isConnected) Color(0xFF22C55E).copy(alpha = 0.7f) else StabiloLime.copy(alpha = 0.5f),
-                    CircleShape
-                )
-                .clickable(onClick = onOpenWifiServer),
-            contentAlignment = Alignment.Center
-        ) {
-            Icon(
-                Icons.Default.Wifi,
-                contentDescription = "Server WiFi",
-                tint = if (isConnected) Color(0xFF22C55E) else StabiloLime,
-                modifier = Modifier.size(18.dp)
-            )
-        }
+        // Dot Server WiFi (dengan tooltip)
+        StabiloTooltipButton(
+            icon = Icons.Default.Wifi,
+            tooltip = "Server WiFi",
+            tint = if (isConnected) Color(0xFF22C55E) else StabiloLime,
+            onClick = onOpenWifiServer,
+            buttonSize = 38.dp,
+            iconSize = 18.dp
+        )
 
         Spacer(modifier = Modifier.height(16.dp))
 
-        // Remote TV
-        IconButton(onClick = onOpenRemote) {
-            Icon(
-                Icons.Default.SettingsRemote,
-                contentDescription = "Remote TV",
-                tint = StabiloPink,
-                modifier = Modifier.size(26.dp)
-            )
-        }
+        // Remote TV -> RAINBOW + tooltip
+        RainbowRemoteIcon(
+            onClick = onOpenRemote,
+            buttonSize = 42.dp,
+            iconSize = 24.dp,
+            tooltip = "Remote TV"
+        )
     }
 }
