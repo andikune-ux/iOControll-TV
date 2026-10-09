@@ -25,6 +25,7 @@ import dev.andikuneiocontroll.ui.components.CrashLogDialog
 import dev.andikuneiocontroll.ui.theme.MyApplicationTheme
 import dev.andikuneiocontroll.util.CrashHandler
 import kotlinx.coroutines.launch
+import java.io.File
 
 class MainActivity : ComponentActivity() {
 
@@ -43,7 +44,7 @@ class MainActivity : ComponentActivity() {
                     modifier = Modifier.fillMaxSize(),
                     color = Color(0xFF0A0F1D)
                 ) {
-                    AppNavigationFlow(viewModel = viewModel)
+                    AppRoot(viewModel = viewModel)
                 }
             }
         }
@@ -56,8 +57,16 @@ private sealed interface AppState {
     data object Main : AppState
 }
 
+/**
+ * AppRoot — root composable yang menampilkan:
+ * 1. Crash dialog (kalau ada crash sebelumnya)
+ * 2. Flow: Splash → Onboarding → Main
+ *
+ * CRASH DIALOG: ditampilkan paling atas (overlay), tidak bisa dismiss
+ * kecuali user tap tombol Salin/Hapus/Tutup.
+ */
 @Composable
-private fun AppNavigationFlow(viewModel: MainViewModel) {
+private fun AppRoot(viewModel: MainViewModel) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
     val prefs = remember { PrefsRepository(context) }
@@ -65,29 +74,38 @@ private fun AppNavigationFlow(viewModel: MainViewModel) {
     var currentState by remember { mutableStateOf<AppState>(AppState.Splash) }
     var onboardingDone by remember { mutableStateOf<Boolean?>(null) }
 
-    // Cek crash log
+    // Crash state
     var crashContent by remember { mutableStateOf("") }
     var crashFileName by remember { mutableStateOf("") }
-    var crashFile by remember { mutableStateOf<java.io.File?>(null) }
+    var crashFile by remember { mutableStateOf<File?>(null) }
     var showCrashDialog by remember { mutableStateOf(false) }
 
+    // Cek crash log SEKALI saat app dibuka
     LaunchedEffect(Unit) {
-        onboardingDone = prefs.getOnboardingDoneOnce()
-
-        // Cek crash log terakhir
-        val file = CrashHandler.getLatestCrashFile(context)
-        if (file != null && file.exists()) {
-            crashContent = try {
-                file.readText()
-            } catch (e: Exception) {
-                "(Gagal baca log: ${e.message})"
+        // 1. Cek crash log DULU (biar langsung muncul)
+        try {
+            val file = CrashHandler.getLatestCrashFile(context)
+            if (file != null && file.exists()) {
+                crashContent = try {
+                    file.readText()
+                } catch (e: Exception) {
+                    "(Gagal baca log: ${e.message})"
+                }
+                crashFileName = file.name
+                crashFile = file
+                showCrashDialog = true
             }
-            crashFileName = file.name
-            crashFile = file
-            showCrashDialog = true
+        } catch (e: Exception) {
+            e.printStackTrace()
         }
+
+        // 2. Cek onboarding
+        onboardingDone = prefs.getOnboardingDoneOnce()
     }
 
+    // ==============================
+    // FLOW UTAMA
+    // ==============================
     when (currentState) {
         AppState.Splash -> {
             SplashScreen(
@@ -121,17 +139,26 @@ private fun AppNavigationFlow(viewModel: MainViewModel) {
         }
     }
 
-    // Crash dialog — tampil di atas semua state
+    // ==============================
+    // CRASH DIALOG — OVERLAY PALING ATAS
+    // ==============================
+    // Ditampilkan SETELAH frame lain render, tidak akan hilang karena recompose.
     if (showCrashDialog) {
         CrashLogDialog(
             crashContent = crashContent,
             crashFileName = crashFileName,
             onDelete = {
-                crashFile?.let { CrashHandler.deleteCrashFile(it) }
+                try {
+                    crashFile?.let { CrashHandler.deleteCrashFile(it) }
+                } catch (e: Exception) {
+                    e.printStackTrace()
+                }
                 showCrashDialog = false
                 crashFile = null
             },
             onDismiss = {
+                // Tutup dialog, tapi JANGAN hapus file
+                // Biar user bisa lihat lagi kalau restart
                 showCrashDialog = false
             }
         )
