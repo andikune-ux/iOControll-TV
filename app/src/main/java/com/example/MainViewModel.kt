@@ -1,13 +1,14 @@
 package dev.andikuneiocontroll
 
 import android.app.Application
-import android.content.Context
 import android.content.Intent
 import android.os.Build
-import android.os.Environment
 import android.widget.Toast
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
+import dev.andikuneiocontroll.data.local.PrefsRepository
+import dev.andikuneiocontroll.data.local.TvEntity
+import dev.andikuneiocontroll.data.local.TvRepository
 import dev.andikuneiocontroll.filemanager.FileManagerHelper
 import dev.andikuneiocontroll.model.ActiveViewer
 import dev.andikuneiocontroll.model.DevicePeer
@@ -17,9 +18,11 @@ import dev.andikuneiocontroll.model.ServerConfig
 import dev.andikuneiocontroll.model.StorageCategoryInfo
 import dev.andikuneiocontroll.remote.RemoteClient
 import dev.andikuneiocontroll.remote.RemoteSocketServer
+import dev.andikuneiocontroll.remote.controller.RemoteController
+import dev.andikuneiocontroll.remote.discovery.DiscoveredTv
+import dev.andikuneiocontroll.remote.discovery.TvDiscoveryManager
 import dev.andikuneiocontroll.server.DiscoveryManager
 import dev.andikuneiocontroll.server.WifiFileServerService
-import dev.andikuneiocontroll.server.WifiHttpServer
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -30,56 +33,86 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
     private val context = application.applicationContext
 
-    // Pane 1 State (Left)
+    // ==========================================================
+    // FILE MANAGER STATE (tidak berubah)
+    // ==========================================================
+
     private val _pane1Path = MutableStateFlow(FileManagerHelper.getDefaultStoragePath())
     val pane1Path: StateFlow<String> = _pane1Path.asStateFlow()
 
     private val _pane1Items = MutableStateFlow<List<FileItem>>(emptyList())
     val pane1Items: StateFlow<List<FileItem>> = _pane1Items.asStateFlow()
 
-    // Pane 2 State (Right)
     private val _pane2Path = MutableStateFlow(FileManagerHelper.getDefaultStoragePath())
     val pane2Path: StateFlow<String> = _pane2Path.asStateFlow()
 
     private val _pane2Items = MutableStateFlow<List<FileItem>>(emptyList())
     val pane2Items: StateFlow<List<FileItem>> = _pane2Items.asStateFlow()
 
-    // Active Pane index for single-pane mobile mode (0: Pane 1, 1: Pane 2 / Remote)
     private val _activePaneIndex = MutableStateFlow(0)
     val activePaneIndex: StateFlow<Int> = _activePaneIndex.asStateFlow()
 
-    // Active Viewer dialog
     private val _activeViewer = MutableStateFlow<ActiveViewer>(ActiveViewer.None)
     val activeViewer: StateFlow<ActiveViewer> = _activeViewer.asStateFlow()
 
-    // Wi-Fi Server Config & Status
     private val _serverConfig = MutableStateFlow(ServerConfig())
     val serverConfig: StateFlow<ServerConfig> = _serverConfig.asStateFlow()
 
     private val _serverUrl = MutableStateFlow("")
     val serverUrl: StateFlow<String> = _serverUrl.asStateFlow()
 
-    // Discovery Manager
     val discoveryManager = DiscoveryManager(context, viewModelScope)
     val discoveredPeers: StateFlow<List<DevicePeer>> = discoveryManager.discoveredPeers
 
-    // TV Remote Subsystem
+    // === Sistem lama (masih dipakai MainScreen versi lama) ===
     val remoteClient = RemoteClient(context, viewModelScope)
     val remoteServer = RemoteSocketServer(context, viewModelScope)
 
-    // Disk Map stats
+    // ==========================================================
+    // REMOTE TV BARU
+    // ==========================================================
+
+    /** Controller utama untuk kontrol TV (6 protokol). */
+    val remoteController = RemoteController(context)
+
+    /** Discovery mDNS + SSDP untuk deteksi TV. */
+    val tvDiscoveryManager = TvDiscoveryManager(context, viewModelScope)
+
+    /** Room database untuk simpan TV terdaftar. */
+    val tvRepository = TvRepository(context)
+
+    /** DataStore untuk pengaturan. */
+    val prefsRepository = PrefsRepository(context)
+
+    // State daftar TV tersimpan (auto-update dari Room)
+    private val _savedTvs = MutableStateFlow<List<TvEntity>>(emptyList())
+    val savedTvs: StateFlow<List<TvEntity>> = _savedTvs.asStateFlow()
+
+    // State daftar TV ditemukan (via discovery)
+    val discoveredTvs: StateFlow<List<DiscoveredTv>> = tvDiscoveryManager.discoveredTvs
+
+    // State loading scan
+    val isScanningTv: StateFlow<Boolean> = tvDiscoveryManager.isScanning
+
+    // ==========================================================
+    // OTHER STATE
+    // ==========================================================
+
     private val _storageCategories = MutableStateFlow<List<StorageCategoryInfo>>(emptyList())
     val storageCategories: StateFlow<List<StorageCategoryInfo>> = _storageCategories.asStateFlow()
 
     private val _totalStorageBytes = MutableStateFlow(1L)
     val totalStorageBytes: StateFlow<Long> = _totalStorageBytes.asStateFlow()
 
-    // UI flags
     private val _showWifiShareDialog = MutableStateFlow(false)
     val showWifiShareDialog: StateFlow<Boolean> = _showWifiShareDialog.asStateFlow()
 
-    private val _rightPaneMode = MutableStateFlow(0) // 0: Remote & Connection status, 1: Second File Explorer Pane
+    private val _rightPaneMode = MutableStateFlow(0)
     val rightPaneMode: StateFlow<Int> = _rightPaneMode.asStateFlow()
+
+    // ==========================================================
+    // INIT
+    // ==========================================================
 
     init {
         loadPane1(FileManagerHelper.getDefaultStoragePath())
@@ -87,14 +120,113 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         discoveryManager.startDiscovery(23016)
         remoteServer.startServer(23017)
 
-        // Observe background service state if active
+        // Observe background server state
         viewModelScope.launch {
             WifiFileServerService.serverState.collect { s ->
                 _serverConfig.value = _serverConfig.value.copy(isRunning = s.isRunning, port = s.port)
                 _serverUrl.value = s.url
             }
         }
+
+        // Observe daftar TV tersimpan (Room)
+        viewModelScope.launch {
+            tvRepository.getAllTvs().collect { list ->
+                _savedTvs.value = list
+            }
+        }
+
+        // Auto-start scan TV saat ViewModel dibuat
+        tvDiscoveryManager.startScan(5000L)
     }
+
+    // ==========================================================
+    // REMOTE TV METHODS
+    // ==========================================================
+
+    /** Scan TV secara manual (dipanggil dari tombol). */
+    fun scanTvs() {
+        tvDiscoveryManager.startScan(5000L)
+    }
+
+    /** Stop scan TV. */
+    fun stopScanTvs() {
+        tvDiscoveryManager.stopScan()
+    }
+
+    /**
+     * Connect ke TV yang ditemukan.
+     * Setelah sukses, simpan ke Room.
+     */
+    fun connectToTv(
+        tv: DiscoveredTv,
+        pairingCode: String = "",
+        onResult: (Boolean, String) -> Unit
+    ) {
+        viewModelScope.launch {
+            remoteController.connect(tv, pairingCode) { success, message ->
+                if (success) {
+                    // Simpan ke Room
+                    viewModelScope.launch {
+                        tvRepository.saveOrUpdateFromDiscovery(
+                            deviceId = tv.deviceId,
+                            originalName = tv.name,
+                            ipAddress = tv.ip,
+                            port = tv.port,
+                            brand = tv.brand,
+                            protocol = tv.protocol,
+                            modelName = tv.modelName
+                        )
+                    }
+                    onResult(true, message)
+                } else {
+                    onResult(false, message)
+                }
+            }
+        }
+    }
+
+    /** Connect ke TV tersimpan (dari Room). */
+    fun connectToSavedTv(
+        tv: TvEntity,
+        onResult: (Boolean, String) -> Unit
+    ) {
+        val discovered = DiscoveredTv(
+            deviceId = tv.deviceId,
+            name = tv.displayName,
+            ip = tv.ipAddress,
+            port = tv.port,
+            brand = tv.brand,
+            protocol = tv.protocol,
+            modelName = tv.modelName
+        )
+        connectToTv(discovered, onResult = onResult)
+    }
+
+    /** Disconnect dari TV. */
+    fun disconnectTv() {
+        viewModelScope.launch {
+            remoteController.disconnect()
+        }
+    }
+
+    /** Hapus TV dari Room. */
+    fun forgetTv(tv: TvEntity) {
+        viewModelScope.launch {
+            tvRepository.deleteTv(tv)
+            Toast.makeText(context, "TV \"${tv.displayName}\" dilupakan", Toast.LENGTH_SHORT).show()
+        }
+    }
+
+    /** Kirim command ke TV. */
+    fun sendTvCommand(command: String, payload: String = "") {
+        viewModelScope.launch {
+            remoteController.sendCommand(command, payload)
+        }
+    }
+
+    // ==========================================================
+    // FILE MANAGER METHODS (tidak berubah)
+    // ==========================================================
 
     fun loadPane1(path: String) {
         viewModelScope.launch {
@@ -139,37 +271,31 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     fun toggleSelectPane1(item: FileItem) {
-        val list = _pane1Items.value.map {
+        _pane1Items.value = _pane1Items.value.map {
             if (it.path == item.path) it.copy(isSelected = !it.isSelected) else it
         }
-        _pane1Items.value = list
     }
 
     fun toggleSelectPane2(item: FileItem) {
-        val list = _pane2Items.value.map {
+        _pane2Items.value = _pane2Items.value.map {
             if (it.path == item.path) it.copy(isSelected = !it.isSelected) else it
         }
-        _pane2Items.value = list
     }
 
     fun selectAllPane1() {
-        val list = _pane1Items.value.map { it.copy(isSelected = true) }
-        _pane1Items.value = list
+        _pane1Items.value = _pane1Items.value.map { it.copy(isSelected = true) }
     }
 
     fun clearSelectPane1() {
-        val list = _pane1Items.value.map { it.copy(isSelected = false) }
-        _pane1Items.value = list
+        _pane1Items.value = _pane1Items.value.map { it.copy(isSelected = false) }
     }
 
     fun selectAllPane2() {
-        val list = _pane2Items.value.map { it.copy(isSelected = true) }
-        _pane2Items.value = list
+        _pane2Items.value = _pane2Items.value.map { it.copy(isSelected = true) }
     }
 
     fun clearSelectPane2() {
-        val list = _pane2Items.value.map { it.copy(isSelected = false) }
-        _pane2Items.value = list
+        _pane2Items.value = _pane2Items.value.map { it.copy(isSelected = false) }
     }
 
     fun switchActivePane() {
@@ -192,7 +318,6 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         _activeViewer.value = ActiveViewer.None
     }
 
-    // Logic for "Salin" (Copy to opposite pane's active folder)
     fun copyToOppositePane(fromPane1: Boolean, isMove: Boolean = false) {
         viewModelScope.launch {
             val selectedFiles = if (fromPane1) {
@@ -229,7 +354,6 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
-    // Custom Wi-Fi Sharing: Share selected files over Wi-Fi
     fun shareSelectedOverWifi(fromPane1: Boolean) {
         val selected = if (fromPane1) {
             _pane1Items.value.filter { it.isSelected }.take(100).map { it.path }
@@ -275,22 +399,17 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         }
         val file = File(item.path)
         when (item.category) {
-            FileCategory.VIDEO -> {
-                // Auto-play immediately as requested
-                _activeViewer.value = ActiveViewer.Video(item.path, item.name)
-            }
+            FileCategory.VIDEO -> _activeViewer.value = ActiveViewer.Video(item.path, item.name)
             FileCategory.IMAGE -> {
                 val imageList = _pane1Items.value.filter { it.category == FileCategory.IMAGE }.map { it.path }
                 _activeViewer.value = ActiveViewer.Image(item.path, item.name, imageList)
             }
-            FileCategory.AUDIO -> {
-                _activeViewer.value = ActiveViewer.Audio(item.path, item.name)
-            }
+            FileCategory.AUDIO -> _activeViewer.value = ActiveViewer.Audio(item.path, item.name)
             FileCategory.ARCHIVE -> {
                 if (item.path.endsWith(".vault")) {
                     _activeViewer.value = ActiveViewer.Vault
                 } else {
-                    loadPane1(item.path) // Browse inside zip archive as folder!
+                    loadPane1(item.path)
                 }
             }
             FileCategory.DOCUMENT, FileCategory.CODE -> {
@@ -303,7 +422,6 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 if (item.path.endsWith(".vault")) {
                     _activeViewer.value = ActiveViewer.Vault
                 } else {
-                    // Default to Hex viewer or share
                     openHexViewer(item)
                 }
             }
@@ -438,5 +556,6 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         discoveryManager.stopDiscovery()
         remoteClient.disconnect()
         remoteServer.stopServer()
+        tvDiscoveryManager.destroy()
     }
 }
