@@ -1,42 +1,54 @@
 package dev.andikuneiocontroll.remote.controller
 
+import android.app.Activity
 import android.content.Context
 import android.content.Intent
+import android.media.projection.MediaProjectionManager
 import android.speech.RecognizerIntent
-import android.speech.SpeechRecognizer
 import android.view.inputmethod.InputMethodManager
 import dev.andikuneiocontroll.remote.protocol.TvCommand
 
 /**
  * VoiceController — kirim perintah suara ke TV.
- * Menggunakan Google Voice via ADB (untuk Android TV).
+ * Menggunakan Google Voice via Intent Recognition.
  */
 class VoiceController(private val context: Context) {
 
     /**
-     * Start voice input dari HP.
-     * Return Intent yang harus di-launch via ActivityResultLauncher.
+     * Create voice intent untuk di-launch via ActivityResultLauncher.
      */
     fun createVoiceIntent(): Intent {
         return Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH).apply {
-            putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_FREE_FORM)
+            putExtra(
+                RecognizerIntent.EXTRA_LANGUAGE_MODEL,
+                RecognizerIntent.LANGUAGE_MODEL_FREE_FORM
+            )
             putExtra(RecognizerIntent.EXTRA_LANGUAGE, "id-ID")
             putExtra(RecognizerIntent.EXTRA_PROMPT, "Ucapkan perintah…")
+            putExtra(RecognizerIntent.EXTRA_MAX_RESULTS, 1)
         }
     }
 
     /**
-     * Kirim text hasil voice ke TV via ADB.
+     * Ambil teks hasil voice recognition dari Intent result.
      */
-    suspend fun sendVoiceText(controller: RemoteController, text: String): Boolean {
-        // Pakai ADB command untuk search
-        return controller.sendCommand("LAUNCH_APP", "com.google.android.katniss")
+    fun extractTextFromResult(data: Intent?): String {
+        if (data == null) return ""
+        val results = data.getStringArrayListExtra(RecognizerIntent.EXTRA_RESULTS)
+        return results?.firstOrNull() ?: ""
+    }
+
+    /**
+     * Kirim teks ke TV (input text).
+     */
+    suspend fun sendTextToTv(controller: RemoteController, text: String): Boolean {
+        if (text.isBlank()) return false
+        return controller.sendCommand(TvCommand.INPUT_TEXT, text)
     }
 }
 
 /**
- * KeyboardController — input text ke TV.
- * Pakai IME HP.
+ * KeyboardController — input text ke TV via IME HP.
  */
 class KeyboardController(private val context: Context) {
 
@@ -49,14 +61,14 @@ class KeyboardController(private val context: Context) {
     }
 
     /**
-     * Hapus karakter.
+     * Kirim backspace.
      */
     suspend fun sendBackspace(controller: RemoteController): Boolean {
         return controller.sendCommand(TvCommand.KEY_DELETE)
     }
 
     /**
-     * Enter.
+     * Kirim enter.
      */
     suspend fun sendEnter(controller: RemoteController): Boolean {
         return controller.sendCommand(TvCommand.KEY_ENTER)
@@ -65,22 +77,21 @@ class KeyboardController(private val context: Context) {
     /**
      * Sembunyikan keyboard.
      */
-    fun hideKeyboard() {
+    fun hideKeyboard(activity: Activity?) {
         try {
             val imm = context.getSystemService(Context.INPUT_METHOD_SERVICE) as InputMethodManager
-            imm.toggleSoftInput(InputMethodManager.HIDE_IMPLICIT_ONLY, 0)
+            activity?.currentFocus?.let {
+                imm.hideSoftInputFromWindow(it.windowToken, 0)
+            }
         } catch (_: Exception) {}
     }
 }
 
 /**
  * MouseController — kontrol kursor TV.
- * - Touchpad mode: drag = gerak kursor
- * - Air mouse mode: gyroscope
  */
 class MouseController(private val context: Context) {
 
-    // Sensitivitas (0-100)
     @Volatile
     var sensitivity: Int = 50
 
@@ -96,7 +107,7 @@ class MouseController(private val context: Context) {
     }
 
     /**
-     * Klik kiri.
+     * Klik.
      */
     suspend fun click(controller: RemoteController): Boolean {
         return controller.sendCommand(TvCommand.MOUSE_CLICK)
@@ -128,12 +139,32 @@ class ScreenCastController(private val context: Context) {
         private set
 
     /**
-     * Start screen cast.
-     * Untuk sekarang hanya return Intent placeholder.
+     * Get MediaProjectionManager untuk request screen capture.
      */
-    fun createCastIntent(): Intent? {
-        // Placeholder — implementasi penuh butuh MediaProjection
-        return null
+    fun getMediaProjectionManager(): MediaProjectionManager? {
+        return try {
+            context.getSystemService(Context.MEDIA_PROJECTION_SERVICE) as? MediaProjectionManager
+        } catch (_: Exception) {
+            null
+        }
+    }
+
+    /**
+     * Create screen capture intent.
+     */
+    fun createScreenCaptureIntent(): Intent? {
+        return try {
+            getMediaProjectionManager()?.createScreenCaptureIntent()
+        } catch (_: Exception) {
+            null
+        }
+    }
+
+    /**
+     * Start cast (placeholder — implementasi penuh butuh Chromecast SDK).
+     */
+    fun startCast() {
+        isCasting = true
     }
 
     /**
@@ -158,7 +189,7 @@ class ShortcutManager(private val context: Context) {
     }
 
     /**
-     * Daftar shortcut default (app populer di Android TV).
+     * Daftar shortcut default.
      */
     fun getDefaultShortcuts(): List<AppShortcut> {
         return listOf(
