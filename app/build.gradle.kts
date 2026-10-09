@@ -13,8 +13,8 @@ android {
         applicationId = "dev.andikuneiocontroll"
         minSdk = 24
         targetSdk = 34
-        versionCode = 3
-        versionName = "V1.00.003"
+        versionCode = 4
+        versionName = "V1.00.004"
         vectorDrawables { useSupportLibrary = true }
 
         ksp {
@@ -122,4 +122,5 @@ dependencies {
     // ==== REMOTE TV — PROTOKOL ====
     implementation(libs.protobuf.javalite)
     implementation(libs.libadb.android)
+    implementation(libs.conscrypt.android)
 }
