@@ -17,17 +17,6 @@ import javax.jmdns.ServiceEvent
 import javax.jmdns.ServiceInfo
 import javax.jmdns.ServiceListener
 
-/**
- * MdnsDiscovery — deteksi TV via mDNS (Multicast DNS).
- *
- * Protokol jmDNS yang didukung:
- * - _androidtvremote2._tcp.local.  → Android TV / Google TV (Remote v2)
- * - _googlecast._tcp.local.         → Chromecast (fallback Android TV)
- * - _airplay._tcp.local.            → Apple TV
- * - _spotify-connect._tcp.local.    → Spotify Connect
- *
- * Hasil dikumpulkan di MutableStateFlow<List<DiscoveredTv>>.
- */
 class MdnsDiscovery(
     private val context: Context,
     private val scope: CoroutineScope
@@ -43,7 +32,6 @@ class MdnsDiscovery(
     private var scanJob: Job? = null
     private val foundMap = mutableMapOf<String, DiscoveredTv>()
 
-    // Service types yang di-scan
     private val serviceTypes = listOf(
         "_androidtvremote2._tcp.local.",
         "_googlecast._tcp.local.",
@@ -68,23 +56,18 @@ class MdnsDiscovery(
                 }
 
                 try {
-                    // Ambil IP lokal
                     val localIp = getLocalIpAddress()
                     if (localIp == null) {
-                        withContext(Dispatchers.Main) {
-                            _isScanning.value = false
-                        }
+                        withContext(Dispatchers.Main) { _isScanning.value = false }
                         return@launch
                     }
 
                     val host = InetAddress.getByName(localIp)
                     jmDNS = JmDNS.create(host, "iOControll-${System.currentTimeMillis()}")
 
-                    // Daftarkan listener untuk setiap service type
                     serviceTypes.forEach { type ->
                         jmDNS?.addServiceListener(type, object : ServiceListener {
                             override fun serviceAdded(event: ServiceEvent) {
-                                // Paksa resolve
                                 jmDNS?.requestServiceInfo(event.type, event.name, 3000)
                             }
 
@@ -96,25 +79,20 @@ class MdnsDiscovery(
                         })
                     }
 
-                    // Tunggu selama durationMs
                     delay(durationMs)
 
                 } finally {
                     try {
                         if (wifiLock.isHeld) wifiLock.release()
                     } catch (_: Exception) {}
-                    try {
-                        jmDNS?.close()
-                    } catch (_: Exception) {}
+                    try { jmDNS?.close() } catch (_: Exception) {}
                     jmDNS = null
                 }
 
             } catch (e: Exception) {
                 e.printStackTrace()
             } finally {
-                withContext(Dispatchers.Main) {
-                    _isScanning.value = false
-                }
+                withContext(Dispatchers.Main) { _isScanning.value = false }
             }
         }
     }
@@ -123,9 +101,7 @@ class MdnsDiscovery(
         scanJob?.cancel()
         scanJob = null
         _isScanning.value = false
-        try {
-            jmDNS?.close()
-        } catch (_: Exception) {}
+        try { jmDNS?.close() } catch (_: Exception) {}
         jmDNS = null
     }
 
@@ -142,7 +118,9 @@ class MdnsDiscovery(
             val port = info.port
             val type = event.type ?: ""
 
-            // Tentukan brand & protocol dari service type
+            // Deteksi Chromecast
+            val isChromecast = type.contains("googlecast", ignoreCase = true)
+
             val (brand, protocol, defaultPort) = when {
                 type.contains("androidtvremote2", ignoreCase = true) -> Triple(
                     "ANDROID_TV", "ANDROID_TV_V2", 6467
@@ -167,10 +145,10 @@ class MdnsDiscovery(
                 brand = brand,
                 protocol = protocol,
                 modelName = info.getPropertyString("model") ?: "",
-                macAddress = info.getPropertyString("mac") ?: ""
+                macAddress = info.getPropertyString("mac") ?: "",
+                hasChromecast = isChromecast
             )
 
-            // Filter HP sendiri
             if (isThisDevice(name, ip)) return
 
             foundMap[deviceId] = tv
