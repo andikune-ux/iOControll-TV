@@ -16,8 +16,6 @@ import dev.andikuneiocontroll.model.FileCategory
 import dev.andikuneiocontroll.model.FileItem
 import dev.andikuneiocontroll.model.ServerConfig
 import dev.andikuneiocontroll.model.StorageCategoryInfo
-import dev.andikuneiocontroll.remote.RemoteClient
-import dev.andikuneiocontroll.remote.RemoteSocketServer
 import dev.andikuneiocontroll.remote.controller.RemoteController
 import dev.andikuneiocontroll.remote.discovery.DiscoveredTv
 import dev.andikuneiocontroll.remote.discovery.TvDiscoveryManager
@@ -34,7 +32,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     private val context = application.applicationContext
 
     // ==========================================================
-    // FILE MANAGER STATE (tidak berubah)
+    // FILE MANAGER STATE
     // ==========================================================
 
     private val _pane1Path = MutableStateFlow(FileManagerHelper.getDefaultStoragePath())
@@ -64,34 +62,19 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     val discoveryManager = DiscoveryManager(context, viewModelScope)
     val discoveredPeers: StateFlow<List<DevicePeer>> = discoveryManager.discoveredPeers
 
-    // === Sistem lama (masih dipakai MainScreen versi lama) ===
-    val remoteClient = RemoteClient(context, viewModelScope)
-    val remoteServer = RemoteSocketServer(context, viewModelScope)
-
     // ==========================================================
-    // REMOTE TV BARU
+    // REMOTE TV
     // ==========================================================
 
-    /** Controller utama untuk kontrol TV (6 protokol). */
     val remoteController = RemoteController(context)
-
-    /** Discovery mDNS + SSDP untuk deteksi TV. */
     val tvDiscoveryManager = TvDiscoveryManager(context, viewModelScope)
-
-    /** Room database untuk simpan TV terdaftar. */
     val tvRepository = TvRepository(context)
-
-    /** DataStore untuk pengaturan. */
     val prefsRepository = PrefsRepository(context)
 
-    // State daftar TV tersimpan (auto-update dari Room)
     private val _savedTvs = MutableStateFlow<List<TvEntity>>(emptyList())
     val savedTvs: StateFlow<List<TvEntity>> = _savedTvs.asStateFlow()
 
-    // State daftar TV ditemukan (via discovery)
     val discoveredTvs: StateFlow<List<DiscoveredTv>> = tvDiscoveryManager.discoveredTvs
-
-    // State loading scan
     val isScanningTv: StateFlow<Boolean> = tvDiscoveryManager.isScanning
 
     // ==========================================================
@@ -118,9 +101,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         loadPane1(FileManagerHelper.getDefaultStoragePath())
         loadPane2(FileManagerHelper.getDefaultStoragePath())
         discoveryManager.startDiscovery(23016)
-        remoteServer.startServer(23017)
 
-        // Observe background server state
         viewModelScope.launch {
             WifiFileServerService.serverState.collect { s ->
                 _serverConfig.value = _serverConfig.value.copy(isRunning = s.isRunning, port = s.port)
@@ -128,14 +109,12 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             }
         }
 
-        // Observe daftar TV tersimpan (Room)
         viewModelScope.launch {
             tvRepository.getAllTvs().collect { list ->
                 _savedTvs.value = list
             }
         }
 
-        // Auto-start scan TV saat ViewModel dibuat
         tvDiscoveryManager.startScan(5000L)
     }
 
@@ -143,20 +122,14 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     // REMOTE TV METHODS
     // ==========================================================
 
-    /** Scan TV secara manual (dipanggil dari tombol). */
     fun scanTvs() {
         tvDiscoveryManager.startScan(5000L)
     }
 
-    /** Stop scan TV. */
     fun stopScanTvs() {
         tvDiscoveryManager.stopScan()
     }
 
-    /**
-     * Connect ke TV yang ditemukan.
-     * Setelah sukses, simpan ke Room.
-     */
     fun connectToTv(
         tv: DiscoveredTv,
         pairingCode: String = "",
@@ -165,7 +138,6 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         viewModelScope.launch {
             remoteController.connect(tv, pairingCode) { success, message ->
                 if (success) {
-                    // Simpan ke Room
                     viewModelScope.launch {
                         tvRepository.saveOrUpdateFromDiscovery(
                             deviceId = tv.deviceId,
@@ -185,7 +157,6 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
-    /** Connect ke TV tersimpan (dari Room). */
     fun connectToSavedTv(
         tv: TvEntity,
         onResult: (Boolean, String) -> Unit
@@ -202,46 +173,40 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         connectToTv(discovered, onResult = onResult)
     }
 
-    /** Disconnect dari TV. */
     fun disconnectTv() {
         viewModelScope.launch {
             remoteController.disconnect()
         }
     }
-    /**
- * Auto-connect ke TV terakhir yang tersimpan di database.
- * Dipanggil dari Splash Screen kalau fitur Auto-Connect aktif.
- */
-fun autoConnectLastTv() {
-    viewModelScope.launch {
-        try {
-            val lastTv = tvRepository.getAutoConnectTv()
-            if (lastTv != null) {
-                val discovered = DiscoveredTv(
-                    deviceId = lastTv.deviceId,
-                    name = lastTv.displayName,
-                    ip = lastTv.ipAddress,
-                    port = lastTv.port,
-                    brand = lastTv.brand,
-                    protocol = lastTv.protocol,
-                    modelName = lastTv.modelName
-                )
-                remoteController.connect(discovered, "") { success, _ ->
-                    if (success) {
-                        // Update timestamp lastConnected
-                        viewModelScope.launch {
-                            tvRepository.updateLastConnected(lastTv.id)
+
+    fun autoConnectLastTv() {
+        viewModelScope.launch {
+            try {
+                val lastTv = tvRepository.getAutoConnectTv()
+                if (lastTv != null) {
+                    val discovered = DiscoveredTv(
+                        deviceId = lastTv.deviceId,
+                        name = lastTv.displayName,
+                        ip = lastTv.ipAddress,
+                        port = lastTv.port,
+                        brand = lastTv.brand,
+                        protocol = lastTv.protocol,
+                        modelName = lastTv.modelName
+                    )
+                    remoteController.connect(discovered, "") { success, _ ->
+                        if (success) {
+                            viewModelScope.launch {
+                                tvRepository.updateLastConnected(lastTv.id)
+                            }
                         }
                     }
                 }
+            } catch (e: Exception) {
+                e.printStackTrace()
             }
-        } catch (e: Exception) {
-            e.printStackTrace()
         }
     }
-}
 
-    /** Hapus TV dari Room. */
     fun forgetTv(tv: TvEntity) {
         viewModelScope.launch {
             tvRepository.deleteTv(tv)
@@ -249,15 +214,15 @@ fun autoConnectLastTv() {
         }
     }
 
-    /** Kirim command ke TV. */
     fun sendTvCommand(command: String, payload: String = "") {
         viewModelScope.launch {
             remoteController.sendCommand(command, payload)
         }
     }
 
-    // ==========================================================
-    // FILE MANAGER METHODS (tidak berubah)
+
+        // ==========================================================
+    // FILE MANAGER METHODS
     // ==========================================================
 
     fun loadPane1(path: String) {
@@ -586,8 +551,6 @@ fun autoConnectLastTv() {
     override fun onCleared() {
         super.onCleared()
         discoveryManager.stopDiscovery()
-        remoteClient.disconnect()
-        remoteServer.stopServer()
         tvDiscoveryManager.destroy()
     }
 }
