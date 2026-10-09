@@ -7,13 +7,13 @@ import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.keyframes
 import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.border
-import androidx.compose.foundation.clickable
-import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.wrapContentSize
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -26,21 +26,16 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
-import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.Dp
-import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.compose.ui.window.Popup
-import androidx.compose.ui.window.PopupProperties
 import dev.andikuneiocontroll.ui.theme.DarkBgCardElevated
 import dev.andikuneiocontroll.ui.theme.StabiloCyan
 import dev.andikuneiocontroll.ui.theme.StabiloLime
@@ -48,20 +43,20 @@ import dev.andikuneiocontroll.ui.theme.StabiloPink
 import dev.andikuneiocontroll.ui.theme.StabiloYellow
 import dev.andikuneiocontroll.ui.theme.TextPrimary
 import kotlinx.coroutines.delay
-import kotlinx.coroutines.launch
-
-enum class TooltipSide { LEFT, RIGHT }
 
 /**
  * Icon Remote TV dengan warna berputar smooth (palet Stabilo).
  * Glow = border tipis 1.5dp, tidak melebar.
+ * Support tooltip saat long-press 1 detik.
  */
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
 fun RainbowRemoteIcon(
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
-    buttonSize: Dp = 40.dp,
-    iconSize: Dp = 24.dp
+    buttonSize: Dp = 42.dp,
+    iconSize: Dp = 24.dp,
+    tooltip: String = "Remote TV"
 ) {
     val infinite = rememberInfiniteTransition(label = "rainbow")
     val color by infinite.animateColor(
@@ -80,31 +75,51 @@ fun RainbowRemoteIcon(
         label = "rainbowColor"
     )
 
-    Box(
-        modifier = modifier
-            .size(buttonSize)
-            .clip(CircleShape)
-            .border(1.5.dp, color.copy(alpha = 0.75f), CircleShape)
-            .clickable(
-                interactionSource = remember { MutableInteractionSource() },
-                indication = null,
-                onClick = onClick
-            ),
-        contentAlignment = Alignment.Center
-    ) {
-        Icon(
-            imageVector = Icons.Default.SettingsRemote,
-            contentDescription = "Remote TV",
-            tint = color,
-            modifier = Modifier.size(iconSize)
-        )
+    var showTooltip by remember { mutableStateOf(false) }
+
+    LaunchedEffect(showTooltip) {
+        if (showTooltip) {
+            delay(2000)
+            showTooltip = false
+        }
+    }
+
+    Box(modifier = modifier) {
+        Box(
+            modifier = Modifier
+                .size(buttonSize)
+                .clip(CircleShape)
+                .border(1.5.dp, color.copy(alpha = 0.75f), CircleShape)
+                .combinedClickable(
+                    onClick = onClick,
+                    onLongClick = { showTooltip = true }
+                ),
+            contentAlignment = Alignment.Center
+        ) {
+            Icon(
+                imageVector = Icons.Default.SettingsRemote,
+                contentDescription = tooltip,
+                tint = color,
+                modifier = Modifier.size(iconSize)
+            )
+        }
+
+        if (showTooltip) {
+            Box(
+                modifier = Modifier
+                    .align(Alignment.Center)
+                    .offset(x = (-88).dp)
+            ) {
+                TooltipBubble(text = tooltip)
+            }
+        }
     }
 }
 
 /**
- * Icon button dengan tooltip.
- * Long press 1 detik -> popup kecil muncul di samping.
+ * Icon button biasa dengan tooltip long-press 1 detik.
  */
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
 fun StabiloTooltipButton(
     icon: ImageVector,
@@ -113,39 +128,26 @@ fun StabiloTooltipButton(
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
     buttonSize: Dp = 44.dp,
-    iconSize: Dp = 26.dp,
-    side: TooltipSide = TooltipSide.RIGHT
+    iconSize: Dp = 26.dp
 ) {
     var showTooltip by remember { mutableStateOf(false) }
-    val scope = rememberCoroutineScope()
 
-    Box(modifier = modifier.wrapContentSize()) {
+    LaunchedEffect(showTooltip) {
+        if (showTooltip) {
+            delay(2000)
+            showTooltip = false
+        }
+    }
+
+    Box(modifier = modifier) {
         Box(
             modifier = Modifier
                 .size(buttonSize)
                 .clip(CircleShape)
-                .pointerInput(Unit) {
-                    awaitPointerEventScope {
-                        while (true) {
-                            awaitPointerEvent()
-                            val down = awaitPointerEvent()
-
-                            var longPressed = false
-                            val longJob = scope.launch {
-                                delay(1000)
-                                longPressed = true
-                                showTooltip = true
-                            }
-
-                            val up = awaitPointerEvent()
-                            longJob.cancel()
-
-                            if (!longPressed && down.changes.isNotEmpty() && up.changes.isNotEmpty()) {
-                                onClick()
-                            }
-                        }
-                    }
-                },
+                .combinedClickable(
+                    onClick = onClick,
+                    onLongClick = { showTooltip = true }
+                ),
             contentAlignment = Alignment.Center
         ) {
             Icon(
@@ -157,32 +159,31 @@ fun StabiloTooltipButton(
         }
 
         if (showTooltip) {
-            LaunchedEffect(showTooltip) {
-                delay(2200)
-                showTooltip = false
-            }
-            val offsetX = if (side == TooltipSide.RIGHT) 60 else -60
-            Popup(
-                alignment = Alignment.Center,
-                offset = IntOffset(offsetX.dp.roundToPx(), 0),
-                properties = PopupProperties(focusable = false),
-                onDismissRequest = { showTooltip = false }
+            Box(
+                modifier = Modifier
+                    .align(Alignment.Center)
+                    .offset(x = (-88).dp)
             ) {
-                Surface(
-                    shape = RoundedCornerShape(8.dp),
-                    color = DarkBgCardElevated,
-                    border = BorderStroke(1.dp, StabiloCyan.copy(alpha = 0.5f)),
-                    shadowElevation = 6.dp
-                ) {
-                    Text(
-                        text = tooltip,
-                        color = TextPrimary,
-                        fontSize = 12.sp,
-                        fontWeight = FontWeight.Bold,
-                        modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp)
-                    )
-                }
+                TooltipBubble(text = tooltip)
             }
         }
+    }
+}
+
+@Composable
+private fun TooltipBubble(text: String) {
+    Surface(
+        shape = RoundedCornerShape(8.dp),
+        color = DarkBgCardElevated,
+        border = BorderStroke(1.dp, StabiloCyan.copy(alpha = 0.6f)),
+        shadowElevation = 8.dp
+    ) {
+        Text(
+            text = text,
+            color = TextPrimary,
+            fontSize = 12.sp,
+            fontWeight = FontWeight.Bold,
+            modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp)
+        )
     }
 }
