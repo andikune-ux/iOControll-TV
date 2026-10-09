@@ -80,6 +80,7 @@ fun TvPickerDialog(
     onSelectDiscovered: (DiscoveredTv) -> Unit,
     onSelectSaved: (TvEntity) -> Unit,
     onDeleteSaved: (TvEntity) -> Unit,
+    onManualIp: () -> Unit,
     onDismiss: () -> Unit
 ) {
     Dialog(onDismissRequest = onDismiss) {
@@ -121,10 +122,28 @@ fun TvPickerDialog(
                     )
                 }
 
+                Spacer(modifier = Modifier.height(8.dp))
+
+                Button(
+                    onClick = onManualIp,
+                    colors = ButtonDefaults.buttonColors(containerColor = DarkBgCardElevated),
+                    border = androidx.compose.foundation.BorderStroke(1.dp, StabiloCyan.copy(alpha = 0.6f)),
+                    shape = RoundedCornerShape(10.dp),
+                    modifier = Modifier.fillMaxWidth().height(46.dp)
+                ) {
+                    Icon(Icons.Default.Link, null, tint = StabiloCyan, modifier = Modifier.size(20.dp))
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text(
+                        "Hubungkan via IP Manual",
+                        color = StabiloCyan,
+                        fontWeight = FontWeight.Bold
+                    )
+                }
+
                 Spacer(modifier = Modifier.height(12.dp))
 
                 LazyColumn(
-                    modifier = Modifier.fillMaxWidth().heightIn(max = 380.dp),
+                    modifier = Modifier.fillMaxWidth().heightIn(max = 360.dp),
                     verticalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
                     if (savedTvs.isNotEmpty()) {
@@ -163,14 +182,19 @@ fun TvPickerDialog(
                     if (!isScanning && savedTvs.isEmpty() && discoveredTvs.isEmpty()) {
                         item {
                             Column(
-                                modifier = Modifier.fillMaxWidth().padding(24.dp),
+                                modifier = Modifier.fillMaxWidth().padding(16.dp),
                                 horizontalAlignment = Alignment.CenterHorizontally
                             ) {
                                 Icon(Icons.Default.Wifi, null, tint = TextMuted, modifier = Modifier.size(40.dp))
                                 Spacer(modifier = Modifier.height(12.dp))
                                 Text("Tidak ada TV ditemukan", color = TextSecondary, fontSize = 13.sp, fontWeight = FontWeight.Bold)
                                 Spacer(modifier = Modifier.height(4.dp))
-                                Text("Cek koneksi WiFi &\npastikan TV menyala", color = TextMuted, fontSize = 11.sp, textAlign = TextAlign.Center)
+                                Text(
+                                    "Cek koneksi WiFi\natau gunakan IP Manual",
+                                    color = TextMuted,
+                                    fontSize = 11.sp,
+                                    textAlign = TextAlign.Center
+                                )
                             }
                         }
                     }
@@ -507,7 +531,9 @@ fun ShortcutDialog(
                     modifier = Modifier.fillMaxWidth().heightIn(max = 380.dp),
                     verticalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
-                    items(shortcuts, key = { it.second }) { (name, packageName) ->
+                    items(shortcuts, key = { it.second }) { item ->
+                        val name = item.first
+                        val packageName = item.second
                         Card(
                             modifier = Modifier
                                 .fillMaxWidth()
@@ -536,8 +562,9 @@ fun ShortcutDialog(
         }
     }
 }
+
 // ==========================================================
-// 6. MANUAL IP DIALOG (untuk TV yang tidak terdeteksi)
+// 6. MANUAL IP DIALOG
 // ==========================================================
 @Composable
 fun ManualIpDialog(
@@ -621,11 +648,7 @@ fun ManualIpDialog(
 
                 if (errorMessage.isNotBlank()) {
                     Spacer(modifier = Modifier.height(8.dp))
-                    Text(
-                        errorMessage,
-                        color = StabiloPink,
-                        fontSize = 11.sp
-                    )
+                    Text(errorMessage, color = StabiloPink, fontSize = 11.sp)
                 }
 
                 Spacer(modifier = Modifier.height(16.dp))
@@ -647,7 +670,6 @@ fun ManualIpDialog(
                         onClick = {
                             val ip = ipInput.trim()
                             val port = portInput.trim().toIntOrNull() ?: 6467
-                            // Validasi IP sederhana
                             if (ip.count { it == '.' } != 3 || ip.endsWith(".")) {
                                 errorMessage = "Format IP tidak valid"
                             } else {
