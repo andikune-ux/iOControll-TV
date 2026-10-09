@@ -18,7 +18,6 @@ import androidx.compose.material.icons.filled.Backup
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.Settings
-import androidx.compose.material.icons.filled.Wifi
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
@@ -37,7 +36,6 @@ import androidx.compose.ui.window.Dialog
 import dev.andikuneiocontroll.ui.theme.DarkBgCard
 import dev.andikuneiocontroll.ui.theme.DarkBgCardElevated
 import dev.andikuneiocontroll.ui.theme.StabiloCyan
-import dev.andikuneiocontroll.ui.theme.StabiloLime
 import dev.andikuneiocontroll.ui.theme.StabiloYellow
 import dev.andikuneiocontroll.ui.theme.TextPrimary
 import dev.andikuneiocontroll.ui.theme.TextSecondary
@@ -46,7 +44,6 @@ import dev.andikuneiocontroll.util.BackupHelper
 @Composable
 fun SettingsDialog(
     context: Context,
-    onOpenWifiServer: () -> Unit,
     onDismiss: () -> Unit
 ) {
     Dialog(onDismissRequest = onDismiss) {
@@ -85,30 +82,6 @@ fun SettingsDialog(
 
                 Spacer(modifier = Modifier.height(18.dp))
 
-                // Tombol Server WiFi
-                Button(
-                    onClick = onOpenWifiServer,
-                    colors = ButtonDefaults.buttonColors(containerColor = StabiloLime),
-                    shape = RoundedCornerShape(10.dp),
-                    modifier = Modifier.fillMaxWidth().height(50.dp)
-                ) {
-                    Icon(
-                        Icons.Default.Wifi,
-                        contentDescription = null,
-                        tint = Color.Black,
-                        modifier = Modifier.size(20.dp)
-                    )
-                    Spacer(modifier = Modifier.width(10.dp))
-                    Text(
-                        "Server WiFi",
-                        color = Color.Black,
-                        fontWeight = FontWeight.Bold,
-                        fontSize = 14.sp
-                    )
-                }
-
-                Spacer(modifier = Modifier.height(10.dp))
-
                 // Tombol Backup Aman
                 Button(
                     onClick = {
@@ -127,29 +100,28 @@ fun SettingsDialog(
                             ).show()
                         }
                     },
-                    colors = ButtonDefaults.buttonColors(containerColor = DarkBgCardElevated),
-                    border = BorderStroke(1.dp, StabiloYellow.copy(alpha = 0.5f)),
+                    colors = ButtonDefaults.buttonColors(containerColor = StabiloYellow),
                     shape = RoundedCornerShape(10.dp),
-                    modifier = Modifier.fillMaxWidth().height(50.dp)
+                    modifier = Modifier.fillMaxWidth().height(52.dp)
                 ) {
                     Icon(
                         Icons.Default.Backup,
                         contentDescription = null,
-                        tint = StabiloYellow,
+                        tint = Color.Black,
                         modifier = Modifier.size(20.dp)
                     )
                     Spacer(modifier = Modifier.width(10.dp))
                     Text(
                         "Backup Aman",
-                        color = TextPrimary,
+                        color = Color.Black,
                         fontWeight = FontWeight.Bold,
-                        fontSize = 14.sp
+                        fontSize = 15.sp
                     )
                 }
 
                 Spacer(modifier = Modifier.height(10.dp))
 
-                // Tombol Tentang (opsional)
+                // Tombol Tentang Aplikasi
                 Button(
                     onClick = {
                         Toast.makeText(
@@ -161,7 +133,7 @@ fun SettingsDialog(
                     colors = ButtonDefaults.buttonColors(containerColor = DarkBgCardElevated),
                     border = BorderStroke(1.dp, StabiloCyan.copy(alpha = 0.4f)),
                     shape = RoundedCornerShape(10.dp),
-                    modifier = Modifier.fillMaxWidth().height(50.dp)
+                    modifier = Modifier.fillMaxWidth().height(52.dp)
                 ) {
                     Icon(
                         Icons.Default.Info,
@@ -174,7 +146,7 @@ fun SettingsDialog(
                         "Tentang Aplikasi",
                         color = TextPrimary,
                         fontWeight = FontWeight.Bold,
-                        fontSize = 14.sp
+                        fontSize = 15.sp
                     )
                 }
             }
