@@ -46,7 +46,6 @@ import androidx.compose.ui.window.DialogProperties
 import dev.andikuneiocontroll.ui.theme.DarkBgCard
 import dev.andikuneiocontroll.ui.theme.DarkBgCardElevated
 import dev.andikuneiocontroll.ui.theme.DarkBgPrimary
-import dev.andikuneiocontroll.ui.theme.StabiloCyan
 import dev.andikuneiocontroll.ui.theme.StabiloLime
 import dev.andikuneiocontroll.ui.theme.StabiloPink
 import dev.andikuneiocontroll.ui.theme.StabiloYellow
@@ -54,15 +53,6 @@ import dev.andikuneiocontroll.ui.theme.TextMuted
 import dev.andikuneiocontroll.ui.theme.TextPrimary
 import dev.andikuneiocontroll.ui.theme.TextSecondary
 
-/**
- * CrashLogDialog — Dialog yang muncul saat app dibuka ulang setelah crash.
- *
- * Fitur:
- * - Tampil preview crash log
- * - Tombol SALIN → copy semua log ke clipboard
- * - Tombol HAPUS → hapus log
- * - Tombol TUTUP → dismiss
- */
 @Composable
 fun CrashLogDialog(
     crashContent: String,
@@ -73,8 +63,12 @@ fun CrashLogDialog(
     val context = LocalContext.current
 
     Dialog(
-        onDismissRequest = onDismiss,
-        properties = DialogProperties(usePlatformDefaultWidth = false)
+        onDismissRequest = { /* KOSONG — tidak bisa dismiss dengan tap luar */ },
+        properties = DialogProperties(
+            usePlatformDefaultWidth = false,
+            dismissOnBackPress = false,
+            dismissOnClickOutside = false
+        )
     ) {
         Box(
             modifier = Modifier
@@ -88,7 +82,6 @@ fun CrashLogDialog(
                 shape = RoundedCornerShape(18.dp)
             ) {
                 Column(modifier = Modifier.padding(20.dp)) {
-                    // Header
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Box(
                             modifier = Modifier
@@ -123,7 +116,7 @@ fun CrashLogDialog(
                     Spacer(modifier = Modifier.height(14.dp))
 
                     Text(
-                        "Aplikasi mengalami crash pada sesi sebelumnya. Salin log di bawah ini untuk dikirim ke developer, lalu hapus log.",
+                        "Aplikasi crash pada sesi sebelumnya. SALIN log di bawah, kirim ke developer, lalu HAPUS log.",
                         color = TextSecondary,
                         fontSize = 11.sp,
                         lineHeight = 16.sp
@@ -131,7 +124,6 @@ fun CrashLogDialog(
 
                     Spacer(modifier = Modifier.height(12.dp))
 
-                    // Preview log
                     Box(
                         modifier = Modifier
                             .fillMaxWidth()
@@ -167,7 +159,6 @@ fun CrashLogDialog(
 
                     Spacer(modifier = Modifier.height(16.dp))
 
-                    // Tombol
                     Row(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.spacedBy(8.dp)
@@ -179,7 +170,7 @@ fun CrashLogDialog(
                             },
                             colors = ButtonDefaults.buttonColors(containerColor = StabiloLime),
                             shape = RoundedCornerShape(10.dp),
-                            modifier = Modifier.weight(1f).height(46.dp)
+                            modifier = Modifier.weight(1f).height(48.dp)
                         ) {
                             Icon(
                                 Icons.Default.ContentCopy,
@@ -188,7 +179,7 @@ fun CrashLogDialog(
                                 modifier = Modifier.size(18.dp)
                             )
                             Spacer(modifier = Modifier.width(6.dp))
-                            Text("Salin", color = Color.Black, fontWeight = FontWeight.Bold)
+                            Text("SALIN", color = Color.Black, fontWeight = FontWeight.Bold)
                         }
 
                         Button(
@@ -198,7 +189,7 @@ fun CrashLogDialog(
                             },
                             colors = ButtonDefaults.buttonColors(containerColor = DarkBgCardElevated),
                             shape = RoundedCornerShape(10.dp),
-                            modifier = Modifier.weight(1f).height(46.dp)
+                            modifier = Modifier.weight(1f).height(48.dp)
                         ) {
                             Icon(
                                 Icons.Default.Delete,
@@ -207,7 +198,7 @@ fun CrashLogDialog(
                                 modifier = Modifier.size(18.dp)
                             )
                             Spacer(modifier = Modifier.width(6.dp))
-                            Text("Hapus", color = StabiloPink, fontWeight = FontWeight.Bold)
+                            Text("HAPUS", color = StabiloPink, fontWeight = FontWeight.Bold)
                         }
                     }
 
@@ -219,7 +210,7 @@ fun CrashLogDialog(
                         shape = RoundedCornerShape(10.dp),
                         modifier = Modifier.fillMaxWidth().height(44.dp)
                     ) {
-                        Text("Tutup", color = TextPrimary)
+                        Text("Tutup Dialog (Log Tetap Tersimpan)", color = TextPrimary, fontSize = 12.sp)
                     }
                 }
             }
