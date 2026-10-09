@@ -3,6 +3,9 @@ package dev.andikuneiocontroll.remote.discovery
 /**
  * Data class hasil discovery TV.
  * Dipakai oleh semua method discovery (mDNS, SSDP, Roku).
+ *
+ * V2 (Update):
+ * - Tambah field hasChromecast untuk deteksi Chromecast built-in
  */
 data class DiscoveredTv(
     /** ID unik dari protokol discovery */
@@ -28,6 +31,9 @@ data class DiscoveredTv(
 
     /** MAC Address (opsional) */
     val macAddress: String = "",
+
+    /** True kalau TV support Chromecast built-in */
+    val hasChromecast: Boolean = false,
 
     /** Timestamp ditemukan */
     val discoveredAt: Long = System.currentTimeMillis()
