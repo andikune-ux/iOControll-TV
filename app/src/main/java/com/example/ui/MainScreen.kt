@@ -51,6 +51,7 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -82,10 +83,12 @@ import dev.andikuneiocontroll.ui.remote.RemoteTvDialog
 import dev.andikuneiocontroll.ui.remote.dialogs.AdbPairingDialog
 import dev.andikuneiocontroll.ui.remote.dialogs.InfoTvDialog
 import dev.andikuneiocontroll.ui.remote.dialogs.InputSourceDialog
+import dev.andikuneiocontroll.ui.remote.dialogs.KeyboardDialog
 import dev.andikuneiocontroll.ui.remote.dialogs.ManualIpDialog
 import dev.andikuneiocontroll.ui.remote.dialogs.PairingPinDialog
 import dev.andikuneiocontroll.ui.remote.dialogs.ShortcutDialog
 import dev.andikuneiocontroll.ui.remote.dialogs.TvPickerDialog
+import dev.andikuneiocontroll.ui.remote.dialogs.VoiceDialog
 import dev.andikuneiocontroll.ui.remote.settings.RemoteSettingsScreen
 import dev.andikuneiocontroll.ui.theme.DarkBgCard
 import dev.andikuneiocontroll.ui.theme.DarkBgCardElevated
@@ -105,12 +108,14 @@ import dev.andikuneiocontroll.viewers.ImageViewerDialog
 import dev.andikuneiocontroll.viewers.TextViewerDialog
 import dev.andikuneiocontroll.viewers.VaultDialog
 import dev.andikuneiocontroll.viewers.VideoPlayerDialog
+import kotlinx.coroutines.launch
 
 @Composable
 fun MainScreen(viewModel: MainViewModel) {
     val context = LocalContext.current
     val configuration = LocalConfiguration.current
     val activity = context as? android.app.Activity
+    val scope = rememberCoroutineScope()
 
     var hasStoragePermission by remember {
         mutableStateOf(
@@ -166,6 +171,8 @@ fun MainScreen(viewModel: MainViewModel) {
     var showInputSourceDialog by remember { mutableStateOf(false) }
     var showShortcutDialog by remember { mutableStateOf(false) }
     var showRemoteSettings by remember { mutableStateOf(false) }
+    var showVoiceDialog by remember { mutableStateOf(false) }
+    var showKeyboardDialog by remember { mutableStateOf(false) }
 
     var pairingTvName by remember { mutableStateOf("") }
     var pairingTv by remember { mutableStateOf<DiscoveredTv?>(null) }
@@ -175,6 +182,11 @@ fun MainScreen(viewModel: MainViewModel) {
     var adbPairingHost by remember { mutableStateOf("") }
     var adbPairingError by remember { mutableStateOf("") }
     var isAdbPairingSubmitting by remember { mutableStateOf(false) }
+
+    var voiceStatus by remember { mutableStateOf("") }
+    var isVoiceSending by remember { mutableStateOf(false) }
+    var keyboardStatus by remember { mutableStateOf("") }
+    var isKeyboardSending by remember { mutableStateOf(false) }
 
     val pane1SelectedCount = remember(pane1Items) { pane1Items.count { it.isSelected } }
     val pane2SelectedCount = remember(pane2Items) { pane2Items.count { it.isSelected } }
@@ -187,7 +199,6 @@ fun MainScreen(viewModel: MainViewModel) {
         }
     }
 
-    // Helper: connect ke TV dengan handle PAIRING_NEEDED
     val connectToTvWithPairingCheck: (DiscoveredTv) -> Unit = { tv ->
         pairingTvName = tv.displayName
         pairingTv = tv
@@ -202,24 +213,20 @@ fun MainScreen(viewModel: MainViewModel) {
                 showRemoteDialog = true
                 Toast.makeText(context, message, Toast.LENGTH_SHORT).show()
             } else if (message.contains("PAIRING_NEEDED", ignoreCase = true)) {
-                // Butuh ADB pairing
                 showTvPickerDialog = false
                 showManualIpDialog = false
                 adbPairingHost = tv.ip
                 adbPairingError = ""
                 showAdbPairingDialog = true
             } else if (message.contains("PIN", ignoreCase = true)) {
-                // Butuh PIN (Android TV Remote v2 / Samsung / LG)
                 showTvPickerDialog = false
                 showManualIpDialog = false
                 showPairingDialog = true
             } else {
-                // Error lain
                 Toast.makeText(context, message, Toast.LENGTH_LONG).show()
             }
         }
     }
-
 
     Scaffold(
     modifier = Modifier.fillMaxSize(),
@@ -458,227 +465,284 @@ fun MainScreen(viewModel: MainViewModel) {
     }
     }
 
-
-        // ==========================================================
-    // SEMUA DIALOG & OVERLAY
     // ==========================================================
+// SEMUA DIALOG & OVERLAY
+// ==========================================================
 
-    if (showSettingsDialog) {
-        SettingsDialog(
-            context = context,
-            onDismiss = { showSettingsDialog = false }
-        )
-    }
+if (showSettingsDialog) {
+    SettingsDialog(
+        context = context,
+        onDismiss = { showSettingsDialog = false }
+    )
+}
 
-    if (showRemoteDialog) {
-        RemoteTvDialog(
-            remoteController = viewModel.remoteController,
-            onDismiss = { showRemoteDialog = false },
-            onOpenSettings = { showRemoteSettings = true },
-            onOpenTvList = {
-                showRemoteDialog = false
-                showTvPickerDialog = true
-            },
-            onOpenInputSource = { showInputSourceDialog = true },
-            onOpenKeyboard = {
-                Toast.makeText(context, "Keyboard akan segera hadir", Toast.LENGTH_SHORT).show()
-            },
-            onOpenCast = {
-                Toast.makeText(context, "Screen Cast akan segera hadir", Toast.LENGTH_SHORT).show()
-            },
-            onOpenShortcut = { showShortcutDialog = true },
-            onOpenInfoTv = { showInfoTvDialog = true }
-        )
-    }
+if (showRemoteDialog) {
+    RemoteTvDialog(
+        remoteController = viewModel.remoteController,
+        onDismiss = { showRemoteDialog = false },
+        onOpenSettings = { showRemoteSettings = true },
+        onOpenTvList = {
+            showRemoteDialog = false
+            showTvPickerDialog = true
+        },
+        onOpenInputSource = { showInputSourceDialog = true },
+        onOpenKeyboard = { showKeyboardDialog = true },
+        onOpenCast = {
+            Toast.makeText(context, "Screen Cast akan segera hadir", Toast.LENGTH_SHORT).show()
+        },
+        onOpenShortcut = { showShortcutDialog = true },
+        onOpenInfoTv = { showInfoTvDialog = true },
+        onOpenVoice = { showVoiceDialog = true },
+        onOpenCopy = {
+            Toast.makeText(context, "Copy Text dari TV belum tersedia", Toast.LENGTH_SHORT).show()
+        }
+    )
+}
 
-    if (showRemoteSettings) {
-        RemoteSettingsScreen(
-            onDismiss = { showRemoteSettings = false }
-        )
-    }
+if (showRemoteSettings) {
+    RemoteSettingsScreen(
+        onDismiss = { showRemoteSettings = false }
+    )
+}
 
-    if (showTvPickerDialog) {
-        TvPickerDialog(
-            discoveredTvs = discoveredTvs,
-            savedTvs = savedTvs,
-            isScanning = isScanningTv,
-            onRefresh = { viewModel.scanTvs() },
-            onSelectDiscovered = { tv -> connectToTvWithPairingCheck(tv) },
-            onSelectSaved = { tv ->
-                showTvPickerDialog = false
-                pairingTvName = tv.displayName
+if (showTvPickerDialog) {
+    TvPickerDialog(
+        discoveredTvs = discoveredTvs,
+        savedTvs = savedTvs,
+        isScanning = isScanningTv,
+        onRefresh = { viewModel.scanTvs() },
+        onSelectDiscovered = { tv -> connectToTvWithPairingCheck(tv) },
+        onSelectSaved = { tv ->
+            showTvPickerDialog = false
+            pairingTvName = tv.displayName
+            isPairingSubmitting = true
+            viewModel.connectToSavedTv(tv) { success, message ->
+                isPairingSubmitting = false
+                if (success) {
+                    showRemoteDialog = true
+                    Toast.makeText(context, message, Toast.LENGTH_SHORT).show()
+                } else {
+                    val discovered = DiscoveredTv(
+                        deviceId = tv.deviceId,
+                        name = tv.displayName,
+                        ip = tv.ipAddress,
+                        port = tv.port,
+                        brand = tv.brand,
+                        protocol = tv.protocol,
+                        hasChromecast = tv.hasChromecast
+                    )
+                    pairingTv = discovered
+                    if (message.contains("PAIRING_NEEDED", ignoreCase = true)) {
+                        adbPairingHost = tv.ipAddress
+                        adbPairingError = ""
+                        showAdbPairingDialog = true
+                    } else {
+                        showPairingDialog = true
+                    }
+                }
+            }
+        },
+        onDeleteSaved = { tv -> viewModel.forgetTv(tv) },
+        onManualIp = {
+            showTvPickerDialog = false
+            showManualIpDialog = true
+        },
+        onDismiss = { showTvPickerDialog = false }
+    )
+}
+
+if (showManualIpDialog) {
+    ManualIpDialog(
+        onSubmit = { ip, port ->
+            showManualIpDialog = false
+            val manualTv = DiscoveredTv(
+                deviceId = "manual_${ip}_$port",
+                name = "TV Manual ($ip)",
+                ip = ip,
+                port = port,
+                brand = "ANDROID_TV",
+                protocol = "ANDROID_TV_V2"
+            )
+            connectToTvWithPairingCheck(manualTv)
+        },
+        onDismiss = { showManualIpDialog = false }
+    )
+}
+
+if (showAdbPairingDialog) {
+    AdbPairingDialog(
+        tvName = pairingTvName,
+        defaultHost = adbPairingHost,
+        isSubmitting = isAdbPairingSubmitting,
+        errorMessage = adbPairingError,
+        onPair = { host, port, code ->
+            isAdbPairingSubmitting = true
+            adbPairingError = ""
+            scope.launch {
+                val result = viewModel.remoteController.pair(host, port, code)
+                isAdbPairingSubmitting = false
+                if (result.first) {
+                    showAdbPairingDialog = false
+                    val tv = pairingTv
+                    if (tv != null) {
+                        connectToTvWithPairingCheck(tv)
+                    }
+                } else {
+                    adbPairingError = result.second
+                }
+            }
+        },
+        onCancel = {
+            showAdbPairingDialog = false
+            adbPairingError = ""
+        }
+    )
+}
+
+if (showPairingDialog) {
+    PairingPinDialog(
+        tvName = pairingTvName,
+        isSubmitting = isPairingSubmitting,
+        errorMessage = pairingError,
+        onSubmit = { pin ->
+            val tv = pairingTv
+            if (tv != null) {
                 isPairingSubmitting = true
-                viewModel.connectToSavedTv(tv) { success, message ->
+                pairingError = ""
+                viewModel.connectToTv(tv, pin) { success, message ->
                     isPairingSubmitting = false
                     if (success) {
+                        showPairingDialog = false
+                        showTvPickerDialog = false
                         showRemoteDialog = true
                         Toast.makeText(context, message, Toast.LENGTH_SHORT).show()
                     } else {
-                        val discovered = DiscoveredTv(
-                            deviceId = tv.deviceId,
-                            name = tv.displayName,
-                            ip = tv.ipAddress,
-                            port = tv.port,
-                            brand = tv.brand,
-                            protocol = tv.protocol
-                        )
-                        pairingTv = discovered
-                        if (message.contains("PAIRING_NEEDED", ignoreCase = true)) {
-                            adbPairingHost = tv.ipAddress
-                            adbPairingError = ""
-                            showAdbPairingDialog = true
-                        } else {
-                            showPairingDialog = true
-                        }
+                        pairingError = message
                     }
                 }
-            },
-            onDeleteSaved = { tv -> viewModel.forgetTv(tv) },
-            onManualIp = {
-                showTvPickerDialog = false
-                showManualIpDialog = true
-            },
-            onDismiss = { showTvPickerDialog = false }
-        )
-    }
-
-    if (showManualIpDialog) {
-        ManualIpDialog(
-            onSubmit = { ip, port ->
-                showManualIpDialog = false
-                val manualTv = DiscoveredTv(
-                    deviceId = "manual_${ip}_$port",
-                    name = "TV Manual ($ip)",
-                    ip = ip,
-                    port = port,
-                    brand = "ANDROID_TV",
-                    protocol = "ANDROID_TV_V2"
-                )
-                connectToTvWithPairingCheck(manualTv)
-            },
-            onDismiss = { showManualIpDialog = false }
-        )
-    }
-
-    if (showAdbPairingDialog) {
-        AdbPairingDialog(
-            tvName = pairingTvName,
-            defaultHost = adbPairingHost,
-            isSubmitting = isAdbPairingSubmitting,
-            errorMessage = adbPairingError,
-            onPair = { host, port, code ->
-                isAdbPairingSubmitting = true
-                adbPairingError = ""
-                kotlinx.coroutines.MainScope().launch {
-                    val (success, message) = viewModel.remoteController.pair(host, port, code)
-                    isAdbPairingSubmitting = false
-                    if (success) {
-                        showAdbPairingDialog = false
-                        // Auto-connect setelah pairing sukses
-                        val tv = pairingTv
-                        if (tv != null) {
-                            connectToTvWithPairingCheck(tv)
-                        }
-                    } else {
-                        adbPairingError = message
-                    }
-                }
-            },
-            onCancel = {
-                showAdbPairingDialog = false
-                adbPairingError = ""
             }
-        )
-    }
+        },
+        onCancel = {
+            showPairingDialog = false
+            pairingError = ""
+            pairingTv = null
+        }
+    )
+}
 
-    if (showPairingDialog) {
-        PairingPinDialog(
-            tvName = pairingTvName,
-            isSubmitting = isPairingSubmitting,
-            errorMessage = pairingError,
-            onSubmit = { pin ->
-                val tv = pairingTv
-                if (tv != null) {
-                    isPairingSubmitting = true
-                    pairingError = ""
-                    viewModel.connectToTv(tv, pin) { success, message ->
-                        isPairingSubmitting = false
-                        if (success) {
-                            showPairingDialog = false
-                            showTvPickerDialog = false
-                            showRemoteDialog = true
-                            Toast.makeText(context, message, Toast.LENGTH_SHORT).show()
-                        } else {
-                            pairingError = message
-                        }
-                    }
-                }
-            },
-            onCancel = {
-                showPairingDialog = false
-                pairingError = ""
-                pairingTv = null
+if (showInfoTvDialog) {
+    val state = viewModel.remoteController.connectionState.collectAsState().value
+    val savedTv = savedTvs.firstOrNull { it.deviceId == state.tv?.deviceId }
+    InfoTvDialog(
+        tvName = state.tv?.displayName ?: "",
+        brand = state.tv?.brand ?: "UNKNOWN",
+        protocolName = state.protocolName,
+        ipAddress = state.tv?.ip ?: "",
+        port = state.tv?.port ?: 0,
+        isConnected = state.isConnected,
+        hasChromecast = state.tv?.hasChromecast == true || (savedTv?.hasChromecast == true),
+        firmwareVersion = savedTv?.firmwareVersion ?: "",
+        onReconnect = {
+            showInfoTvDialog = false
+            val tv = state.tv
+            if (tv != null) {
+                connectToTvWithPairingCheck(tv)
             }
-        )
-    }
+        },
+        onForget = {
+            showInfoTvDialog = false
+            val state2 = viewModel.remoteController.connectionState.value
+            val tvId = state2.tv?.deviceId ?: ""
+            val found = savedTvs.firstOrNull { it.deviceId == tvId }
+            if (found != null) viewModel.forgetTv(found)
+        },
+        onDismiss = { showInfoTvDialog = false }
+    )
+}
 
-    if (showInfoTvDialog) {
-        val state = viewModel.remoteController.connectionState.collectAsState().value
-        InfoTvDialog(
-            tvName = state.tv?.displayName ?: "",
-            brand = state.tv?.brand ?: "UNKNOWN",
-            protocolName = state.protocolName,
-            ipAddress = state.tv?.ip ?: "",
-            port = state.tv?.port ?: 0,
-            isConnected = state.isConnected,
-            onReconnect = {
-                showInfoTvDialog = false
-                val tv = state.tv
-                if (tv != null) {
-                    viewModel.connectToTv(tv, "") { _, _ -> }
-                }
-            },
-            onForget = {
-                showInfoTvDialog = false
-                val state2 = viewModel.remoteController.connectionState.value
-                val tvId = state2.tv?.deviceId ?: ""
-                val found = savedTvs.firstOrNull { it.deviceId == tvId }
-                if (found != null) viewModel.forgetTv(found)
-            },
-            onDismiss = { showInfoTvDialog = false }
-        )
-    }
+if (showInputSourceDialog) {
+    InputSourceDialog(
+        onSelect = { cmd ->
+            showInputSourceDialog = false
+            viewModel.sendTvCommand(cmd)
+        },
+        onDismiss = { showInputSourceDialog = false }
+    )
+}
 
-    if (showInputSourceDialog) {
-        InputSourceDialog(
-            onSelect = { cmd ->
-                showInputSourceDialog = false
-                viewModel.sendTvCommand(cmd)
-            },
-            onDismiss = { showInputSourceDialog = false }
-        )
-    }
+if (showShortcutDialog) {
+    val shortcuts = listOf(
+        "YouTube" to "com.google.android.youtube.tv",
+        "Netflix" to "com.netflix.ninja",
+        "Prime Video" to "com.amazon.amazonvideo.livingroom",
+        "Disney+" to "com.disney.disneyplus",
+        "Spotify" to "com.spotify.tv.android",
+        "VLC" to "org.videolan.vlc",
+        "Plex" to "com.plexapp.android",
+        "Chrome" to "com.android.chrome"
+    )
+    ShortcutDialog(
+        shortcuts = shortcuts,
+        onLaunch = { _, pkg ->
+            showShortcutDialog = false
+            viewModel.sendTvCommand(TvCommand.LAUNCH_APP, pkg)
+        },
+        onDismiss = { showShortcutDialog = false }
+    )
+}
 
-    if (showShortcutDialog) {
-        val shortcuts = listOf(
-            "YouTube" to "com.google.android.youtube.tv",
-            "Netflix" to "com.netflix.ninja",
-            "Prime Video" to "com.amazon.amazonvideo.livingroom",
-            "Disney+" to "com.disney.disneyplus",
-            "Spotify" to "com.spotify.tv.android",
-            "VLC" to "org.videolan.vlc",
-            "Plex" to "com.plexapp.android",
-            "Chrome" to "com.android.chrome"
-        )
-        ShortcutDialog(
-            shortcuts = shortcuts,
-            onLaunch = { _, pkg ->
-                showShortcutDialog = false
-                viewModel.sendTvCommand(TvCommand.LAUNCH_APP, pkg)
-            },
-            onDismiss = { showShortcutDialog = false }
-        )
-    }
+if (showVoiceDialog) {
+    VoiceDialog(
+        isSending = isVoiceSending,
+        statusMessage = voiceStatus,
+        onResult = { text ->
+            isVoiceSending = true
+            voiceStatus = "Mengirim: \"$text\""
+            scope.launch {
+                viewModel.sendTvCommand(TvCommand.INPUT_TEXT, text)
+                isVoiceSending = false
+                voiceStatus = "Terkirim: \"$text\""
+                kotlinx.coroutines.delay(1500)
+                showVoiceDialog = false
+                voiceStatus = ""
+            }
+        },
+        onDismiss = {
+            showVoiceDialog = false
+            voiceStatus = ""
+        }
+    )
+}
+
+if (showKeyboardDialog) {
+    KeyboardDialog(
+        isSending = isKeyboardSending,
+        statusMessage = keyboardStatus,
+        onSendText = { text ->
+            isKeyboardSending = true
+            keyboardStatus = "Mengirim…"
+            scope.launch {
+                viewModel.sendTvCommand(TvCommand.INPUT_TEXT, text)
+                isKeyboardSending = false
+                keyboardStatus = "Terkirim"
+            }
+        },
+        onBackspace = {
+            scope.launch {
+                viewModel.sendTvCommand(TvCommand.KEY_DELETE)
+            }
+        },
+        onEnter = {
+            scope.launch {
+                viewModel.sendTvCommand(TvCommand.KEY_ENTER)
+            }
+        },
+        onDismiss = {
+            showKeyboardDialog = false
+            keyboardStatus = ""
+        }
+    )
+}
 
     if (showLauncherOverlay) {
         StabiloLauncherDialog(
@@ -784,17 +848,13 @@ fun StabiloMultiSelectionBar(
     onClear: () -> Unit
 ) {
     Card(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(8.dp),
+        modifier = Modifier.fillMaxWidth().padding(8.dp),
         colors = CardDefaults.cardColors(containerColor = DarkBgCardElevated),
         border = BorderStroke(1.dp, StabiloLime.copy(alpha = 0.5f)),
         shape = RoundedCornerShape(14.dp)
     ) {
         Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 10.dp, vertical = 6.dp),
+            modifier = Modifier.fillMaxWidth().padding(horizontal = 10.dp, vertical = 6.dp),
             horizontalArrangement = Arrangement.SpaceEvenly,
             verticalAlignment = Alignment.CenterVertically
         ) {
@@ -853,9 +913,7 @@ fun StabiloLauncherDialog(
 ) {
     Dialog(onDismissRequest = onDismiss) {
         Card(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(16.dp),
+            modifier = Modifier.fillMaxWidth().padding(16.dp),
             colors = CardDefaults.cardColors(containerColor = DarkBgCard),
             border = BorderStroke(1.dp, StabiloLime.copy(alpha = 0.5f)),
             shape = RoundedCornerShape(16.dp)
