@@ -249,10 +249,27 @@ fun MainScreen(viewModel: MainViewModel) {
                                 }
                                 Spacer(modifier = Modifier.height(12.dp))
 
-                                ConnectionStatusDot(
-                                    isConnected = isServerRunning,
-                                    onClick = { showSettingsDialog = true }
-                                )
+                                // Dot -> BUKA SERVER WIFI
+                                Box(
+                                    modifier = Modifier
+                                        .size(38.dp)
+                                        .clip(CircleShape)
+                                        .background(DarkBgCardElevated)
+                                        .border(
+                                            1.5.dp,
+                                            if (isServerRunning) Color(0xFF22C55E).copy(alpha = 0.7f) else StabiloLime.copy(alpha = 0.5f),
+                                            CircleShape
+                                        )
+                                        .clickable { viewModel.setShowWifiShareDialog(true) },
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    Icon(
+                                        Icons.Default.Wifi,
+                                        contentDescription = "Server WiFi",
+                                        tint = if (isServerRunning) Color(0xFF22C55E) else StabiloLime,
+                                        modifier = Modifier.size(18.dp)
+                                    )
+                                }
                             }
 
                             IconButton(
@@ -321,8 +338,8 @@ fun MainScreen(viewModel: MainViewModel) {
                     isLeftPaneVisible = isLeftPaneVisible,
                     onTogglePane = { isLeftPaneVisible = !isLeftPaneVisible },
                     onOpenSettings = { showSettingsDialog = true },
+                    onOpenWifiServer = { viewModel.setShowWifiShareDialog(true) },
                     onOpenRemote = { showRemoteDialog = true },
-                    onOpenConnectionDialog = { showSettingsDialog = true },
                     isConnected = isServerRunning,
                     paneContent = {
                         if (isLeftPaneVisible) {
@@ -381,10 +398,6 @@ fun MainScreen(viewModel: MainViewModel) {
     if (showSettingsDialog) {
         SettingsDialog(
             context = context,
-            onOpenWifiServer = {
-                showSettingsDialog = false
-                viewModel.setShowWifiShareDialog(true)
-            },
             onDismiss = { showSettingsDialog = false }
         )
     }
@@ -471,6 +484,7 @@ fun MainScreen(viewModel: MainViewModel) {
         else -> {}
     }
 }
+
 @Composable
 fun ConnectionStatusDot(isConnected: Boolean, onClick: () -> Unit) {
     val dotColor = if (isConnected) Color(0xFF22C55E) else TextMuted
@@ -559,6 +573,7 @@ fun StabiloMultiSelectionBar(
         }
     }
 }
+
 @Composable
 fun StabiloLauncherDialog(
     onOpenApps: () -> Unit,
