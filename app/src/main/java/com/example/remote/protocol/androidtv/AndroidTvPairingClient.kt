@@ -1,7 +1,6 @@
 package dev.andikuneiocontroll.remote.protocol.androidtv
 
 import android.content.Context
-import android.provider.Settings
 import android.util.Log
 import dev.andikuneiocontroll.remote.protocol.androidtv.proto.PairingMessageProto
 import kotlinx.coroutines.Dispatchers
@@ -10,43 +9,27 @@ import java.io.DataInputStream
 import java.io.DataOutputStream
 import java.net.InetSocketAddress
 import java.security.cert.X509Certificate
-import java.util.UUID
 import javax.net.ssl.SSLContext
 import javax.net.ssl.SSLSocket
 
 /**
  * AndroidTvPairingClient — Handle pairing flow Android TV Remote v2.
  *
- * Protokol lengkap sesuai pairingmessage.proto:
- * 1. TLS connect ke TV port 6467  (WAJIB IPv4, IPv6 link-local tidak support)
- * 2. HP → TV : PairingRequest (service_name + client_name UNIK)
- * 3. TV → HP : PairingRequestAck (server_name)   status=200 = OK
- * 4. TV → HP : PairingOption (input_encodings + output_encodings)
- * 5. HP → TV : PairingConfiguration (encoding + client_role="1")
- * 6. TV → HP : PairingConfigurationAck   ← trigger PIN muncul di TV
- * 7. TV     : TAMPILKAN PIN 6 karakter
- * 8. HP → TV : PairingSecret (SPAKE2)
- * 9. TV → HP : PairingSecretAck
- *
- * PENTING: client_name HARUS unik per HP supaya TV tidak menolak
- * pairing dengan status=2 (name collision dengan client lain).
- * client_name di-generate sekali & disimpan di SharedPreferences.
+ * KUNCI PROTOKOL:
+ * - client_name di PairingRequest HARUS == CN pada TLS client cert.
+ *   Di-resolve dari TlsHelper.getOrCreateClientName(context) — sumber tunggal.
+ * - Kalau mismatch → TV tolak dengan PairingMessage.status = 2.
  */
 class AndroidTvPairingClient(private val context: Context) {
 
     companion object {
         private const val TAG = "AtvPairing"
         private const val PORT = 6467
-        private const val SERVICE_NAME = "atvremote"   // WAJIB "atvremote"
+        private const val SERVICE_NAME = "atvremote"
         private const val CLIENT_ROLE = "1"
 
-        private const val PREFS_NAME = "atv_pairing_prefs"
-        private const val KEY_CLIENT_NAME = "client_name"
-
-        /** Cek apakah host adalah IPv6 (mengandung ':') */
         private fun isIpv6(host: String): Boolean = host.contains(":")
 
-        /** Cek apakah host IPv6 link-local (fe80::/10) */
         private fun isIpv6LinkLocal(host: String): Boolean {
             val lower = host.lowercase()
             return lower.startsWith("fe80:") || lower.startsWith("fe80%")
@@ -58,8 +41,8 @@ class AndroidTvPairingClient(private val context: Context) {
     private var output: DataOutputStream? = null
     private var spake2: Spake2? = null
 
-    /** client_name unik — di-resolve sekali di constructor */
-    private val clientName: String = resolveClientName(context)
+    /** client_name dari TlsHelper — dijamin sama dengan CN cert. */
+    private val clientName: String = TlsHelper.getOrCreateClientName(context)
 
     @Volatile
     var isPaired: Boolean = false
@@ -69,14 +52,9 @@ class AndroidTvPairingClient(private val context: Context) {
     var lastError: String = ""
         private set
 
-    /**
-     * Langkah 1 — Buka koneksi TLS, kirim request, tunggu PairingConfigurationAck.
-     * Setelah fungsi ini return true, TV SUDAH menampilkan kode.
-     */
     suspend fun startPairing(host: String): Pair<Boolean, String> {
         return withContext(Dispatchers.IO) {
             try {
-                // ── Validasi host ──────────────────────────────
                 if (host.isBlank()) {
                     lastError = "Host kosong"
                     return@withContext false to lastError
@@ -101,7 +79,8 @@ class AndroidTvPairingClient(private val context: Context) {
                 socket = s
                 input = DataInputStream(s.getInputStream())
                 output = DataOutputStream(s.getOutputStream())
-                Log.d(TAG, "TLS connected ke $host:$PORT (client=$clientName)")
+                Log.d(TAG, "TLS connected ke $host:$PORT")
+                Log.d(TAG, "client_name=$clientName (harus == CN cert)")
 
                 // ── 2. Kirim PairingRequest ────────────────────
                 val request = PairingMessageProto.PairingMessage.newBuilder()
@@ -124,9 +103,8 @@ class AndroidTvPairingClient(private val context: Context) {
                 }
                 logMessageFields("PairingRequestAck", ack)
 
-                // Cek status dulu — status != 0/200 = TV tolak di level protokol
                 if (ack.status != 0 && ack.status != 200) {
-                    lastError = "TV tolak pairing (status=${ack.status}) — coba hapus data pairing lama di TV"
+                    lastError = "TV tolak pairing (status=${ack.status}) — kemungkinan cert CN mismatch"
                     disconnect()
                     return@withContext false to lastError
                 }
@@ -197,9 +175,6 @@ class AndroidTvPairingClient(private val context: Context) {
         }
     }
 
-    /**
-     * Langkah 2 — Kirim kode dari TV ke HP (SPAKE2).
-     */
     suspend fun sendPin(pin: String): Pair<Boolean, String> {
         return withContext(Dispatchers.IO) {
             try {
@@ -266,9 +241,6 @@ class AndroidTvPairingClient(private val context: Context) {
         }
     }
 
-    /**
-     * Disconnect socket.
-     */
     fun disconnect() {
         try {
             input?.close()
@@ -284,42 +256,6 @@ class AndroidTvPairingClient(private val context: Context) {
     // INTERNAL
     // ==========================================================
 
-    /**
-     * Resolve client_name unik & persisten.
-     * Disimpan di SharedPreferences supaya konsisten antar sesi —
-     * TV mengenali HP yang sama setelah pairing.
-     */
-    private fun resolveClientName(ctx: Context): String {
-        val prefs = ctx.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
-        val existing = prefs.getString(KEY_CLIENT_NAME, null)
-        if (!existing.isNullOrBlank()) return existing
-
-        val name = buildClientName(ctx)
-        prefs.edit().putString(KEY_CLIENT_NAME, name).apply()
-        Log.d(TAG, "Client name baru di-generate: $name")
-        return name
-    }
-
-    /**
-     * Build client_name unik.
-     * Format: 32 hex char (16 byte random) — sama seperti Google TV official app.
-     * Seed dari ANDROID_ID + timestamp + UUID biar dijamin unik.
-     */
-    private fun buildClientName(ctx: Context): String {
-        val androidId = try {
-            Settings.Secure.getString(ctx.contentResolver, Settings.Secure.ANDROID_ID)
-        } catch (_: Exception) { null }
-
-        // Random UUID hex (32 char) — dijamin unik
-        val uuidHex = UUID.randomUUID().toString().replace("-", "").lowercase()
-
-        // Log seed untuk debugging (jangan dipakai sebagai nama)
-        Log.d(TAG, "Seed: androidId=${androidId?.take(6)}… timestamp=${System.currentTimeMillis()}")
-
-        return uuidHex.take(32)
-    }
-
-    /** Pilih encoding dari yang TV sediakan — prioritas HEX. */
     private fun pickEncoding(inputRaw: String, outputRaw: String): String {
         val all = (inputRaw + "," + outputRaw)
             .split(",")
@@ -329,7 +265,6 @@ class AndroidTvPairingClient(private val context: Context) {
         return all.firstOrNull() ?: "HEX"
     }
 
-    /** Log semua field PairingMessage yang terisi — untuk debugging. */
     private fun logMessageFields(label: String, msg: PairingMessageProto.PairingMessage) {
         try {
             val fields = buildString {
