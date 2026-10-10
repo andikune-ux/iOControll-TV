@@ -2,6 +2,7 @@ package dev.andikuneiocontroll.remote.protocol.androidtv
 
 import android.content.Context
 import android.util.Base64
+import android.util.Log
 import java.io.File
 import java.math.BigInteger
 import java.security.KeyPair
@@ -10,9 +11,9 @@ import java.security.KeyStore
 import java.security.PrivateKey
 import java.security.SecureRandom
 import java.security.Security
-import java.security.cert.Certificate
 import java.security.cert.X509Certificate
 import java.util.Date
+import java.util.UUID
 import javax.net.ssl.KeyManagerFactory
 import javax.net.ssl.SSLContext
 import javax.net.ssl.TrustManager
@@ -27,25 +28,27 @@ import org.bouncycastle.jce.provider.BouncyCastleProvider
 import org.bouncycastle.operator.jcajce.JcaContentSignerBuilder
 
 /**
- * TlsHelper — Helper untuk TLS cert Android TV Remote v2.
+ * TlsHelper — Helper TLS untuk Android TV Remote v2.
  *
- * Digunakan untuk:
- * 1. Generate self-signed cert di HP (client cert)
- * 2. Simpan / muat cert dari file
- * 3. Build SSLContext untuk TLS handshake ke TV
- *
- * Android TV Remote v2 memakai TLS dengan self-signed cert
- * pada kedua sisi (TV & HP). Setelah pairing sukses, cert
- * HP disimpan oleh TV dan sebaliknya → koneksi berikutnya auto-trust.
+ * KUNCI PROTOKOL:
+ * - CN (Common Name) cert client HARUS SAMA dengan client_name di PairingRequest.
+ * - Kalau beda → TV tolak pairing dengan PairingMessage.status = 2.
+ * - Cert CN & client_name = hex unik per-install (persistent di SharedPreferences).
  */
 object TlsHelper {
 
-    private const val CERT_FILE = "atv_client_cert.pem"
-    private const val KEY_FILE = "atv_client_key.pem"
-    private const val KEYSTORE_FILE = "atv_client.p12"
+    private const val TAG = "TlsHelper"
+
+    // Bump versi → paksa regenerasi cert baru (buang cert lama yang CN-nya mismatch)
+    private const val KEYSTORE_FILE = "atv_client_v2.p12"
     private const val KEYSTORE_PASSWORD = "iocontroll_atv"
     private const val CERT_ALIAS = "atv_client"
     private const val CERT_VALIDITY_YEARS = 10
+
+    private const val CERT_FILE = "atv_server_cert.pem"
+
+    private const val PREFS_NAME = "atv_pairing_prefs"
+    private const val KEY_CLIENT_NAME = "client_name"
 
     @Volatile
     private var initialized = false
@@ -63,10 +66,30 @@ object TlsHelper {
         }
     }
 
+    // ==========================================================
+    // CLIENT NAME — sumber tunggal untuk cert CN & PairingRequest
+    // ==========================================================
+
     /**
-     * Dapatkan atau buat keystore client.
-     * Keystore ini menyimpan cert + private key untuk TLS.
+     * Dapatkan (atau generate baru) client_name unik untuk install ini.
+     * Format: 32 hex char (16 byte) — sama seperti Google TV official app.
+     * Persisten di SharedPreferences supaya konsisten setelah pairing.
      */
+    fun getOrCreateClientName(context: Context): String {
+        val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+        val existing = prefs.getString(KEY_CLIENT_NAME, null)
+        if (!existing.isNullOrBlank()) return existing
+
+        val name = UUID.randomUUID().toString().replace("-", "").lowercase()
+        prefs.edit().putString(KEY_CLIENT_NAME, name).apply()
+        Log.d(TAG, "client_name baru: $name")
+        return name
+    }
+
+    // ==========================================================
+    // KEYSTORE & CERT
+    // ==========================================================
+
     fun getOrCreateKeyStore(context: Context): KeyStore {
         init()
         val keyStoreFile = File(context.filesDir, KEYSTORE_FILE)
@@ -79,7 +102,7 @@ object TlsHelper {
                 }
                 return keyStore
             } catch (e: Exception) {
-                // Corrupt — regenerate
+                Log.w(TAG, "Keystore lama rusak, regenerate: ${e.message}")
                 keyStoreFile.delete()
             }
         }
@@ -87,7 +110,7 @@ object TlsHelper {
         // Generate baru
         keyStore.load(null, null)
         val keyPair = generateRsaKeyPair()
-        val cert = generateSelfSignedCert(keyPair)
+        val cert = generateSelfSignedCert(context, keyPair)
 
         keyStore.setKeyEntry(
             CERT_ALIAS,
@@ -96,17 +119,14 @@ object TlsHelper {
             arrayOf(cert)
         )
 
-        // Simpan ke file
         keyStoreFile.outputStream().use { output ->
             keyStore.store(output, KEYSTORE_PASSWORD.toCharArray())
         }
 
+        Log.d(TAG, "Keystore baru dibuat, CN=${(cert.subjectX500Principal.name)}")
         return keyStore
     }
 
-    /**
-     * Ambil client certificate dari keystore.
-     */
     fun getClientCertificate(context: Context): X509Certificate? {
         return try {
             val keyStore = getOrCreateKeyStore(context)
@@ -117,9 +137,6 @@ object TlsHelper {
         }
     }
 
-    /**
-     * Ambil client private key dari keystore.
-     */
     fun getClientPrivateKey(context: Context): PrivateKey? {
         return try {
             val keyStore = getOrCreateKeyStore(context)
@@ -131,19 +148,17 @@ object TlsHelper {
     }
 
     /**
-     * Build SSLContext untuk TLS handshake.
-     * - Pakai client cert dari keystore
+     * Build SSLContext untuk TLS handshake ke TV.
+     * - Pakai client cert (CN = client_name)
      * - Trust semua server cert (TV pakai self-signed)
      */
     fun buildSslContext(context: Context): SSLContext {
         init()
         val keyStore = getOrCreateKeyStore(context)
 
-        // KeyManager dari client cert
         val kmf = KeyManagerFactory.getInstance(KeyManagerFactory.getDefaultAlgorithm())
         kmf.init(keyStore, KEYSTORE_PASSWORD.toCharArray())
 
-        // TrustManager trust-all (TV self-signed)
         val trustAllCerts = arrayOf<TrustManager>(object : X509TrustManager {
             override fun checkClientTrusted(chain: Array<X509Certificate>, authType: String) {}
             override fun checkServerTrusted(chain: Array<X509Certificate>, authType: String) {}
@@ -155,9 +170,10 @@ object TlsHelper {
         return sslContext
     }
 
-    /**
-     * Simpan cert dari TV (setelah pairing).
-     */
+    // ==========================================================
+    // SERVER CERT — cert TV setelah pairing sukses
+    // ==========================================================
+
     fun saveServerCertificate(context: Context, cert: X509Certificate) {
         try {
             val file = File(context.filesDir, CERT_FILE)
@@ -167,9 +183,6 @@ object TlsHelper {
         }
     }
 
-    /**
-     * Muat cert TV yang tersimpan.
-     */
     fun loadServerCertificate(context: Context): X509Certificate? {
         return try {
             val file = File(context.filesDir, CERT_FILE)
@@ -183,34 +196,27 @@ object TlsHelper {
         }
     }
 
-    /**
-     * Cek apakah sudah pernah pairing dengan TV.
-     */
     fun hasPairingData(context: Context): Boolean {
         return File(context.filesDir, CERT_FILE).exists()
     }
 
-    /**
-     * Hapus semua data pairing.
-     */
     fun clearPairingData(context: Context) {
         try {
             File(context.filesDir, CERT_FILE).delete()
             File(context.filesDir, KEYSTORE_FILE).delete()
+            context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+                .edit().remove(KEY_CLIENT_NAME).apply()
         } catch (e: Exception) {
             e.printStackTrace()
         }
     }
 
-    /**
-     * Ambil cert sebagai Base64 (untuk dikirim ke TV).
-     */
     fun certToBase64(cert: X509Certificate): String {
         return Base64.encodeToString(cert.encoded, Base64.NO_WRAP)
     }
 
     // ==========================================================
-    // INTERNAL: Generate cert & key
+    // INTERNAL
     // ==========================================================
 
     private fun generateRsaKeyPair(): KeyPair {
@@ -219,12 +225,20 @@ object TlsHelper {
         return generator.generateKeyPair()
     }
 
-    private fun generateSelfSignedCert(keyPair: KeyPair): X509Certificate {
+    /**
+     * Generate self-signed cert.
+     *
+     * WAJIB: CN = client_name (kalau beda, TV tolak pairing dengan status=2).
+     */
+    private fun generateSelfSignedCert(context: Context, keyPair: KeyPair): X509Certificate {
+        val clientName = getOrCreateClientName(context)
+
         val now = System.currentTimeMillis()
-        val startDate = Date(now - 24 * 60 * 60 * 1000L) // kemarin
+        val startDate = Date(now - 24 * 60 * 60 * 1000L)
         val endDate = Date(now + CERT_VALIDITY_YEARS.toLong() * 365 * 24 * 60 * 60 * 1000L)
 
-        val subject = X500Name("CN=atvremote, O=androidtvremote2, OU=Android, C=US")
+        // CN = client_name (kunci!)
+        val subject = X500Name("CN=$clientName, O=androidtvremote2, OU=Android, C=US")
 
         val serial = BigInteger.valueOf(now)
 
@@ -237,9 +251,7 @@ object TlsHelper {
             keyPair.public
         )
 
-        // Basic constraints — bukan CA
         builder.addExtension(Extension.basicConstraints, true, BasicConstraints(false))
-        // Key usage — digital signature + key encipherment
         builder.addExtension(
             Extension.keyUsage,
             true,
