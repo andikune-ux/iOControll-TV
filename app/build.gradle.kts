@@ -3,6 +3,7 @@ plugins {
     alias(libs.plugins.kotlin.android)
     alias(libs.plugins.kotlin.compose)
     alias(libs.plugins.ksp)
+    alias(libs.plugins.protobuf)
 }
 
 android {
@@ -49,6 +50,24 @@ android {
 
     kotlinOptions { jvmTarget = "17" }
     buildFeatures { compose = true }
+
+    // ==========================================================
+    // PROTOBUF CONFIG — untuk Android TV Remote v2
+    // ==========================================================
+    protobuf {
+        protoc {
+            artifact = "com.google.protobuf:protoc:3.25.3"
+        }
+        generateProtoTasks {
+            all().forEach { task ->
+                task.builtins {
+                    create("java") {
+                        option("lite")
+                    }
+                }
+            }
+        }
+    }
 
     packaging {
         resources {
@@ -123,4 +142,5 @@ dependencies {
     implementation(libs.protobuf.javalite)
     implementation(libs.libadb.android)
     implementation(libs.conscrypt.android)
+    implementation(libs.bcprov.jdk18on)
 }
