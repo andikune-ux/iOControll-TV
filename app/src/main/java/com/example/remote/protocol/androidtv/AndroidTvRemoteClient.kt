@@ -18,10 +18,11 @@ import javax.net.ssl.SSLSocket
  * AndroidTvRemoteClient — Client remote control Android TV Remote v2.
  *
  * Flow pairing (2 TAHAP):
- *   Tahap 1: connect(tv, "")     → panggil startPairing() → TV tampilkan kode
- *   Tahap 2: connect(tv, "DF0C4B") → panggil sendPin(code) → TV verifikasi
+ *   Tahap 1: connect(tv, "")       → startPairing()  → TV tampilkan kode
+ *   Tahap 2: connect(tv, "DF0C4B") → sendPin(code)   → TV verifikasi
  *
- * Setelah pairing sukses, connect ke port 6466 untuk kirim perintah.
+ * PENTING: callback onResult SELALU dipanggil di Main thread supaya
+ * UI (Toast/Dialog) tidak crash dengan Looper error.
  */
 class AndroidTvRemoteClient(private val context: Context) : TvProtocol {
 
@@ -64,39 +65,31 @@ class AndroidTvRemoteClient(private val context: Context) : TvProtocol {
         pairingCode: String,
         onResult: (Boolean, String) -> Unit
     ) {
-        withContext(Dispatchers.IO) {
+        // 1) Lakukan SEMUA kerja IO di thread IO
+        val (success, message) = withContext(Dispatchers.IO) {
             try {
                 pairingHost = tv.ip
-
                 val hasCert = TlsHelper.hasPairingData(context)
 
-                // ==================================================
-                // KASUS A — Sudah pernah pairing → langsung connect
-                // ==================================================
+                // ── KASUS A — Sudah pernah pairing → langsung connect ──
                 if (hasCert && pairingCode.isBlank()) {
-                    if (doConnect(tv.ip)) {
+                    return@withContext if (doConnect(tv.ip)) {
                         connected = true
                         needsPairing = false
-                        onResult(true, "Terhubung ke TV")
+                        true to "Terhubung ke TV"
                     } else {
-                        // Cert rusak/kadaluarsa → pairing ulang
                         TlsHelper.clearPairingData(context)
                         needsPairing = true
-                        onResult(false, "PAIRING_NEEDED")
+                        false to "PAIRING_NEEDED"
                     }
-                    return@withContext
                 }
 
-                // ==================================================
-                // KASUS B — Belum ada kode → MULAI pairing
-                //           TV akan menampilkan kode di layar
-                // ==================================================
+                // ── KASUS B — Belum ada kode → MULAI pairing ──
+                // TV akan menampilkan kode di layar
                 if (pairingCode.isBlank()) {
-                    // Kalau sesi pairing sudah aktif, jangan mulai ulang
                     if (pairingClient != null) {
                         needsPairing = true
-                        onResult(false, "PAIRING_NEEDED")
-                        return@withContext
+                        return@withContext false to "PAIRING_NEEDED"
                     }
 
                     val client = AndroidTvPairingClient(context)
@@ -104,25 +97,19 @@ class AndroidTvRemoteClient(private val context: Context) : TvProtocol {
                     if (!ok) {
                         client.disconnect()
                         needsPairing = false
-                        onResult(false, "Gagal mulai pairing: $msg")
-                        return@withContext
+                        return@withContext false to "Gagal mulai pairing: $msg"
                     }
 
-                    // Simpan sesi — TV sudah menampilkan kode
                     pairingClient = client
                     needsPairing = true
-                    onResult(false, "PAIRING_NEEDED")
-                    return@withContext
+                    return@withContext false to "PAIRING_NEEDED"
                 }
 
-                // ==================================================
-                // KASUS C — Ada kode dari user → kirim ke TV
-                // ==================================================
+                // ── KASUS C — Ada kode dari user → kirim ke TV ──
                 val client = pairingClient
                 if (client == null) {
                     needsPairing = false
-                    onResult(false, "Sesi pairing kadaluarsa, pilih TV ulang")
-                    return@withContext
+                    return@withContext false to "Sesi pairing kadaluarsa, pilih TV ulang"
                 }
 
                 val (ok, msg) = client.sendPin(pairingCode)
@@ -131,22 +118,25 @@ class AndroidTvRemoteClient(private val context: Context) : TvProtocol {
 
                 if (!ok) {
                     needsPairing = true
-                    onResult(false, "Kode salah: $msg")
-                    return@withContext
+                    return@withContext false to "Kode salah: $msg"
                 }
 
-                // Pairing sukses → connect ke port 6466
                 needsPairing = false
                 if (doConnect(tv.ip)) {
                     connected = true
-                    onResult(true, "Pairing berhasil!")
+                    true to "Pairing berhasil!"
                 } else {
-                    onResult(false, "Pairing OK, gagal connect ke TV")
+                    false to "Pairing OK, gagal connect ke TV"
                 }
             } catch (e: Exception) {
                 e.printStackTrace()
-                onResult(false, "Error: ${e.message}")
+                false to "Error: ${e.message}"
             }
+        }
+
+        // 2) Panggil callback di MAIN thread — supaya UI aman
+        withContext(Dispatchers.Main) {
+            onResult(success, message)
         }
     }
 
