@@ -94,6 +94,8 @@ android {
             excludes += "/META-INF/ASL2.0"
             excludes += "/META-INF/*.kotlin_module"
             excludes += "/META-INF/io.netty.versions.properties"
+            // BouncyCastle Multi-Release JAR (bcprov/bcpkix/bcutil)
+            excludes += "/META-INF/versions/**"
         }
     }
 }
