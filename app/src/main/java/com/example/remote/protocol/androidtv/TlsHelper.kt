@@ -29,19 +29,17 @@ import org.bouncycastle.operator.jcajce.JcaContentSignerBuilder
 /**
  * TlsHelper — Helper TLS untuk Android TV Remote v2.
  *
- * Mengikuti pola yang dipakai Home Assistant (tronikos/androidtvremote2):
- * - client_name: string deskriptif & PERSISTEN ("iOControll Tv")
- * - CN cert client HARUS SAMA dengan client_name di PairingRequest
- *   (kalau beda → TV tolak dengan PairingMessage.status = 2)
+ * V3.1:
+ * - Eksplisit pakai TLSv1.2 (Android TV Remote Service cuma support 1.2)
+ * - Fix fallback negotiation
  */
 object TlsHelper {
 
     private const val TAG = "TlsHelper"
 
-    // Nama client — deskriptif & tetap
     private const val DEFAULT_CLIENT_NAME = "iOControll Tv"
 
-    // v3 → paksa regenerate cert (buang v1/v2 yang format client_name-nya beda)
+    // v3 → paksa regenerate cert
     private const val KEYSTORE_FILE = "atv_client_v3.p12"
     private const val KEYSTORE_PASSWORD = "iocontroll_atv"
     private const val CERT_ALIAS = "atv_client"
@@ -65,28 +63,15 @@ object TlsHelper {
         }
     }
 
-    // ==========================================================
-    // CLIENT NAME — deskriptif, persisten, sumber tunggal
-    // ==========================================================
-
-    /**
-     * Dapatkan (atau set default) client_name unik untuk install ini.
-     * Dipakai BAIK untuk CN cert MAUPUN PairingRequest.client_name.
-     */
     fun getOrCreateClientName(context: Context): String {
         val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
         val existing = prefs.getString(KEY_CLIENT_NAME, null)
         if (!existing.isNullOrBlank()) return existing
 
-        // Pakai nama deskriptif (sama seperti "Home Assistant" di HA)
         prefs.edit().putString(KEY_CLIENT_NAME, DEFAULT_CLIENT_NAME).apply()
         Log.d(TAG, "client_name diset: $DEFAULT_CLIENT_NAME")
         return DEFAULT_CLIENT_NAME
     }
-
-    // ==========================================================
-    // KEYSTORE & CERT
-    // ==========================================================
 
     fun getOrCreateKeyStore(context: Context): KeyStore {
         init()
@@ -144,6 +129,10 @@ object TlsHelper {
         }
     }
 
+    /**
+     * Build SSLContext untuk TLS handshake ke TV.
+     * FIX: eksplisit TLSv1.2 (Android TV Remote Service butuh versi ini).
+     */
     fun buildSslContext(context: Context): SSLContext {
         init()
         val keyStore = getOrCreateKeyStore(context)
@@ -157,14 +146,17 @@ object TlsHelper {
             override fun getAcceptedIssuers(): Array<X509Certificate> = arrayOf()
         })
 
-        val sslContext = SSLContext.getInstance("TLS")
+        // Coba TLSv1.2 dulu (paling kompatibel dengan Android TV)
+        val sslContext = try {
+            SSLContext.getInstance("TLSv1.2")
+        } catch (e: Exception) {
+            Log.w(TAG, "TLSv1.2 tidak tersedia, fallback ke TLS: ${e.message}")
+            SSLContext.getInstance("TLS")
+        }
+
         sslContext.init(kmf.keyManagers, trustAllCerts, SecureRandom())
         return sslContext
     }
-
-    // ==========================================================
-    // SERVER CERT
-    // ==========================================================
 
     fun saveServerCertificate(context: Context, cert: X509Certificate) {
         try {
@@ -195,7 +187,6 @@ object TlsHelper {
         try {
             File(context.filesDir, CERT_FILE).delete()
             File(context.filesDir, KEYSTORE_FILE).delete()
-            // Hapus juga v1 & v2 lama kalau ada
             File(context.filesDir, "atv_client.p12").delete()
             File(context.filesDir, "atv_client_v2.p12").delete()
             context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
@@ -219,10 +210,6 @@ object TlsHelper {
         return generator.generateKeyPair()
     }
 
-    /**
-     * Generate self-signed cert.
-     * WAJIB: CN = client_name (kalau beda → status=2 dari TV).
-     */
     private fun generateSelfSignedCert(context: Context, keyPair: KeyPair): X509Certificate {
         val clientName = getOrCreateClientName(context)
 
@@ -230,7 +217,6 @@ object TlsHelper {
         val startDate = Date(now - 24 * 60 * 60 * 1000L)
         val endDate = Date(now + CERT_VALIDITY_YEARS.toLong() * 365 * 24 * 60 * 60 * 1000L)
 
-        // CN = client_name  (KUNCI)
         val subject = X500Name("CN=$clientName, O=androidtvremote2, OU=Android, C=US")
         val serial = BigInteger.valueOf(now)
 
