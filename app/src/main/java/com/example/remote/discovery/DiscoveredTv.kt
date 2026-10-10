@@ -4,8 +4,9 @@ package dev.andikuneiocontroll.remote.discovery
  * Data class hasil discovery TV.
  * Dipakai oleh semua method discovery (mDNS, SSDP, Roku).
  *
- * V2 (Update):
- * - Tambah field hasChromecast untuk deteksi Chromecast built-in
+ * V3 (Update):
+ * - Tambah helper isConnectable / isIpv6LinkLocal / stableKey
+ * - Dedup key stabil (bukan pakai IP)
  */
 data class DiscoveredTv(
     /** ID unik dari protokol discovery */
@@ -14,7 +15,7 @@ data class DiscoveredTv(
     /** Nama asli dari TV (contoh: "Samsung Smart TV") */
     val name: String,
 
-    /** IP Address */
+    /** IP Address (IPv4 — wajib untuk connect) */
     val ip: String,
 
     /** Port untuk koneksi (protokol spesifik) */
@@ -41,6 +42,30 @@ data class DiscoveredTv(
     /** Nama tampilan — pakai name, fallback ke ip */
     val displayName: String
         get() = name.ifBlank { ip }
+
+    /**
+     * Kunci stabil untuk dedup — TIDAK pakai IP.
+     * Prioritas: macAddress > deviceId tanpa IP > name
+     */
+    val stableKey: String
+        get() {
+            if (macAddress.isNotBlank()) return "mac:$macAddress"
+            val cleaned = deviceId
+                .replace(Regex("_?\\d+\\.\\d+\\.\\d+\\.\\d+_?"), "_")
+                .replace(Regex("_?[0-9a-fA-F:]{3,}_?"), "_")
+            return "id:$brand:${cleaned.ifBlank { name }}"
+        }
+
+    /** True kalau IP bisa dipakai untuk connect langsung */
+    val isConnectable: Boolean
+        get() = ip.isNotBlank() && !isIpv6LinkLocal(ip) && !isIpv6(ip)
+
+    private fun isIpv6(host: String) = host.contains(":")
+
+    private fun isIpv6LinkLocal(host: String): Boolean {
+        val lower = host.lowercase()
+        return lower.startsWith("fe80:") || lower.startsWith("fe80%")
+    }
 }
 
 /**
