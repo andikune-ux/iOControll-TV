@@ -6,6 +6,8 @@ import dev.andikuneiocontroll.remote.protocol.ProtocolDetector
 import dev.andikuneiocontroll.remote.protocol.TvCommand
 import dev.andikuneiocontroll.remote.protocol.TvProtocol
 import dev.andikuneiocontroll.remote.protocol.adb.AdbTvClient
+import dev.andikuneiocontroll.remote.protocol.androidtv.AndroidTvRemoteClient
+import dev.andikuneiocontroll.remote.protocol.androidtv.TlsHelper
 import dev.andikuneiocontroll.remote.protocol.lg.LgWebOsClient
 import dev.andikuneiocontroll.remote.protocol.philips.PhilipsClient
 import dev.andikuneiocontroll.remote.protocol.roku.RokuEcpClient
@@ -19,16 +21,26 @@ class RemoteController(context: Context) {
 
     private val appContext = context.applicationContext
 
-    private val adbClient: TvProtocol = AdbTvClient(appContext)
+    // ==========================================================
+    // PROTOKOL CLIENTS
+    // ==========================================================
+    private val androidTvV2Client: AndroidTvRemoteClient = AndroidTvRemoteClient(appContext)
+    private val adbClient: AdbTvClient = AdbTvClient(appContext)
     private val rokuClient: TvProtocol = RokuEcpClient(appContext)
     private val samsungClient: TvProtocol = SamsungTizenClient(appContext)
     private val lgClient: TvProtocol = LgWebOsClient(appContext)
     private val philipsClient: TvProtocol = PhilipsClient(appContext)
     private val vizioClient: TvProtocol = VizioClient(appContext)
 
+    // Urutan prioritas: v2 → ADB → brand-specific
     private val allProtocols: List<TvProtocol> = listOf(
-        adbClient, rokuClient, samsungClient,
-        lgClient, philipsClient, vizioClient
+        androidTvV2Client, // UTAMA untuk Google/Android TV
+        adbClient,          // fallback
+        rokuClient,
+        samsungClient,
+        lgClient,
+        philipsClient,
+        vizioClient
     )
 
     private var activeProtocol: TvProtocol? = null
@@ -36,9 +48,9 @@ class RemoteController(context: Context) {
     private val _connectionState = MutableStateFlow(RemoteConnectionState())
     val connectionState: StateFlow<RemoteConnectionState> = _connectionState.asStateFlow()
 
-    // ==========================================
+    // ==========================================================
     // CONNECT
-    // ==========================================
+    // ==========================================================
 
     suspend fun connect(
         tv: DiscoveredTv,
@@ -85,12 +97,18 @@ class RemoteController(context: Context) {
     }
 
     private fun pickProtocol(tv: DiscoveredTv): TvProtocol? {
+        // Untuk Google TV / Android TV → v2 dulu
+        if (tv.brand.uppercase() in listOf("ANDROID_TV", "GOOGLE_TV", "FIRE_TV")) {
+            return androidTvV2Client
+        }
+
+        // Brand lain → cari yang cocok
         val candidates = allProtocols.filter { it.canHandle(tv) }
         if (candidates.isNotEmpty()) return candidates.first()
 
         val protocolId = ProtocolDetector.detect(tv)
         return when (protocolId) {
-            "ANDROID_TV_V2" -> adbClient
+            "ANDROID_TV_V2" -> androidTvV2Client
             "ROKU_ECP" -> rokuClient
             "SAMSUNG_TIZEN" -> samsungClient
             "LG_WEBOS" -> lgClient
@@ -100,9 +118,9 @@ class RemoteController(context: Context) {
         }
     }
 
-    // ==========================================
-    // PAIRING
-    // ==========================================
+    // ==========================================================
+    // PAIRING ADB (fallback lama)
+    // ==========================================================
 
     suspend fun pair(
         host: String,
@@ -110,12 +128,8 @@ class RemoteController(context: Context) {
         pairingCode: String
     ): Pair<Boolean, String> {
         return try {
-            val adbProtocol = allProtocols.firstOrNull { it is AdbTvClient } as? AdbTvClient
-            if (adbProtocol == null) {
-                return false to "Protokol ADB tidak tersedia"
-            }
-            adbProtocol.pair(host, pairingPort, pairingCode) 
-    ?: (false to "Pairing tidak didukung protokol ini")
+            adbClient.pair(host, pairingPort, pairingCode)
+                ?: (false to "Pairing tidak didukung protokol ini")
         } catch (e: Exception) {
             e.printStackTrace()
             false to "Error pairing: ${e.message ?: "Unknown"}"
@@ -123,19 +137,21 @@ class RemoteController(context: Context) {
     }
 
     fun getPairingInfo(): Triple<Boolean, String, Int>? {
-        val adbProtocol = allProtocols.firstOrNull { it is AdbTvClient } as? AdbTvClient
-            ?: return null
-        return Triple(adbProtocol.needsPairing, adbProtocol.pairingHost, adbProtocol.pairingPort)
+        return Triple(adbClient.needsPairing, adbClient.pairingHost, adbClient.pairingPort)
     }
 
     fun clearPairing(host: String? = null) {
-        val adbProtocol = allProtocols.firstOrNull { it is AdbTvClient } as? AdbTvClient
-        adbProtocol?.clearPairing(host)
+        try {
+            adbClient.clearPairing(host)
+            TlsHelper.clearPairingData(appContext)
+        } catch (e: Exception) {
+            e.printStackTrace()
+        }
     }
 
-    // ==========================================
+    // ==========================================================
     // DISCONNECT
-    // ==========================================
+    // ==========================================================
 
     suspend fun disconnect() {
         try {
@@ -147,9 +163,9 @@ class RemoteController(context: Context) {
         _connectionState.value = RemoteConnectionState()
     }
 
-    // ==========================================
+    // ==========================================================
     // SEND COMMAND
-    // ==========================================
+    // ==========================================================
 
     suspend fun sendCommand(command: String, payload: String = ""): Boolean {
         val protocol = activeProtocol ?: return false
@@ -163,13 +179,9 @@ class RemoteController(context: Context) {
         }
     }
 
-    fun isConnected(): Boolean {
-        return activeProtocol?.isConnected() ?: false
-    }
+    fun isConnected(): Boolean = activeProtocol?.isConnected() ?: false
 
-    fun getActiveProtocolName(): String {
-        return activeProtocol?.protocolName ?: ""
-    }
+    fun getActiveProtocolName(): String = activeProtocol?.protocolName ?: ""
 
     fun getConnectedTv(): DiscoveredTv? {
         val state = _connectionState.value
@@ -181,43 +193,9 @@ class RemoteController(context: Context) {
         _connectionState.value = current.copy(error = "")
     }
 
-    // ==========================================
-    // FITUR TAMBAHAN (Fase C + D)
-    // ==========================================
-
-    /**
-     * Copy text dari TV (Fase C).
-     * Implementasi: kirim command COPY_TEXT, response di-handle di UI.
-     * Untuk ADB, tidak support direct copy — placeholder.
-     */
-    suspend fun copyTextFromTv(): String? {
-        // TODO: Implementasi penuh butuh protokol yang support clipboard
-        return null
-    }
-
-    /**
-     * Rotate screen TV (Fase D).
-     */
-    suspend fun rotateScreen(): Boolean {
-        return sendCommand(TvCommand.ROTATE_SCREEN)
-    }
-
-    /**
-     * Ambil info firmware TV (Fase D).
-     * Hanya ADB yang support via `getprop`.
-     */
-    suspend fun getFirmwareInfo(): String? {
-        val protocol = activeProtocol ?: return null
-        if (protocol is AdbTvClient) {
-            // Kirim perintah getprop via ADB
-            return "Android TV (unknown version)"
-        }
-        return null
-    }
-
-    // ==========================================
+    // ==========================================================
     // QUICK COMMANDS
-    // ==========================================
+    // ==========================================================
 
     suspend fun dpadUp() = sendCommand(TvCommand.DPAD_UP)
     suspend fun dpadDown() = sendCommand(TvCommand.DPAD_DOWN)
