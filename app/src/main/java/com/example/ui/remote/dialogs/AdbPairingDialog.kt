@@ -88,13 +88,13 @@ fun AdbPairingDialog(
                     Spacer(modifier = Modifier.width(10.dp))
                     Column(modifier = Modifier.weight(1f)) {
                         Text(
-                            "Pairing Wireless Debugging",
+                            "Pairing ADB Wireless Debugging",
                             color = StabiloCyan,
                             fontWeight = FontWeight.Bold,
-                            fontSize = 16.sp
+                            fontSize = 15.sp
                         )
                         Text(
-                            tvName.ifBlank { "Google TV" },
+                            tvName.ifBlank { "Android TV" },
                             color = TextSecondary,
                             fontSize = 11.sp
                         )
@@ -123,7 +123,7 @@ fun AdbPairingDialog(
                         Spacer(modifier = Modifier.width(8.dp))
                         Column {
                             Text(
-                                "Cara dapat kode pairing:",
+                                "Cara dapat kode pairing ADB:",
                                 color = TextPrimary,
                                 fontSize = 12.sp,
                                 fontWeight = FontWeight.Bold
