@@ -11,12 +11,22 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import java.net.Inet4Address
 import java.net.InetAddress
 import javax.jmdns.JmDNS
 import javax.jmdns.ServiceEvent
 import javax.jmdns.ServiceInfo
 import javax.jmdns.ServiceListener
 
+/**
+ * MdnsDiscovery — deteksi TV via mDNS/NSD.
+ *
+ * V3 fix:
+ * - Pilih IPv4 eksplisit (bukan firstOrNull()) supaya tidak salah
+ *   ambil IPv6 link-local (fe80::) yang tidak bisa di-connect.
+ * - Dedup by stable key (brand + name + mac) — BUKAN pakai IP.
+ *   1 TV = 1 entri, walau di-resolve berkali-kali.
+ */
 class MdnsDiscovery(
     private val context: Context,
     private val scope: CoroutineScope
@@ -111,14 +121,23 @@ class MdnsDiscovery(
             val addresses = info.inetAddresses ?: return
             if (addresses.isEmpty()) return
 
-            val ip = addresses.firstOrNull()?.hostAddress ?: return
-            if (ip.isEmpty() || ip == "0.0.0.0") return
+            // FIX: pilih IPv4 saja
+            val ipv4 = addresses.filterIsInstance<Inet4Address>().firstOrNull()
+            val ip: String = ipv4?.hostAddress
+                ?: addresses
+                    .firstOrNull { addr ->
+                        val h = addr.hostAddress ?: return@firstOrNull false
+                        !h.startsWith("fe80:", ignoreCase = true) && !h.contains(":")
+                    }
+                    ?.hostAddress
+                ?: return
+
+            if (ip.isBlank() || ip == "0.0.0.0") return
 
             val name = info.name ?: "Unknown TV"
             val port = info.port
             val type = event.type ?: ""
 
-            // Deteksi Chromecast
             val isChromecast = type.contains("googlecast", ignoreCase = true)
 
             val (brand, protocol, defaultPort) = when {
@@ -134,24 +153,41 @@ class MdnsDiscovery(
                 else -> Triple("UNKNOWN", "UNKNOWN", port)
             }
 
-            val deviceId = "${brand}_${ip}_${port}"
             val finalPort = if (port > 0) port else defaultPort
 
+            if (isThisDevice(name, ip)) return
+
+            // FIX DEDUP: stableKey (brand + name + mac)
+            val mac = info.getPropertyString("mac") ?: ""
+            val stableKey = buildString {
+                append("mdns:")
+                append(brand).append(":")
+                append(name.lowercase().trim())
+                if (mac.isNotBlank()) append(":").append(mac)
+            }
+
             val tv = DiscoveredTv(
-                deviceId = deviceId,
+                deviceId = stableKey,
                 name = name,
                 ip = ip,
                 port = finalPort,
                 brand = brand,
                 protocol = protocol,
                 modelName = info.getPropertyString("model") ?: "",
-                macAddress = info.getPropertyString("mac") ?: "",
+                macAddress = mac,
                 hasChromecast = isChromecast
             )
 
-            if (isThisDevice(name, ip)) return
+            val existing = foundMap[stableKey]
+            if (existing != null) {
+                val newIsV4 = !ip.contains(":")
+                val oldIsV4 = !existing.ip.contains(":")
+                val finalTv = if (newIsV4 && !oldIsV4) tv else existing
+                foundMap[stableKey] = finalTv
+            } else {
+                foundMap[stableKey] = tv
+            }
 
-            foundMap[deviceId] = tv
             _discoveredTvs.value = foundMap.values.toList()
 
         } catch (e: Exception) {
