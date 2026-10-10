@@ -1,8 +1,6 @@
 package dev.andikuneiocontroll.remote.protocol.androidtv
 
 import android.content.Context
-import android.net.ConnectivityManager
-import android.net.NetworkCapabilities
 import android.util.Log
 import dev.andikuneiocontroll.remote.protocol.androidtv.proto.PairingMessageProto
 import kotlinx.coroutines.Dispatchers
@@ -10,7 +8,6 @@ import kotlinx.coroutines.withContext
 import java.io.DataInputStream
 import java.io.DataOutputStream
 import java.net.InetSocketAddress
-import java.net.Socket
 import java.security.cert.X509Certificate
 import javax.net.ssl.SSLContext
 import javax.net.ssl.SSLSocket
@@ -18,11 +15,7 @@ import javax.net.ssl.SSLSocket
 /**
  * AndroidTvPairingClient — Handle pairing flow Android TV Remote v2.
  *
- * FIX V4:
- * - Connect timeout 5s → 15s (Android TV butuh waktu handshake)
- * - Bind socket ke WiFi network (hindari HP pakai data seluler)
- * - Set soTimeout 15s untuk read
- * - Upgrade raw socket ke TLS (cara resmi Android TV Remote v2)
+ * V3.1 — Simple socket, no bindSocket, log super detail.
  */
 class AndroidTvPairingClient(private val context: Context) {
 
@@ -62,6 +55,9 @@ class AndroidTvPairingClient(private val context: Context) {
     suspend fun startPairing(host: String): Pair<Boolean, String> {
         return withContext(Dispatchers.IO) {
             try {
+                Log.d(TAG, "========== START PAIRING ==========")
+                Log.d(TAG, "host=$host, port=$PORT, client='$clientName'")
+
                 if (host.isBlank()) {
                     lastError = "Host kosong"
                     return@withContext false to lastError
@@ -77,31 +73,33 @@ class AndroidTvPairingClient(private val context: Context) {
 
                 TlsHelper.init()
                 val sslContext: SSLContext = TlsHelper.buildSslContext(context)
+                Log.d(TAG, "SSLContext = ${sslContext.protocol}")
 
-                // ── 1. Bikin raw socket & bind ke WiFi network ─────
-                Log.d(TAG, "Connecting ke $host:$PORT (timeout=${CONNECT_TIMEOUT_MS}ms)")
-                val rawSocket = Socket()
-                bindToWifiNetwork(rawSocket)
-
-                // ── 2. TCP connect dengan timeout lebih panjang ────
-                val t0 = System.currentTimeMillis()
-                rawSocket.connect(InetSocketAddress(host, PORT), CONNECT_TIMEOUT_MS)
-                val connectMs = System.currentTimeMillis() - t0
-                Log.d(TAG, "TCP connected dalam ${connectMs}ms")
-
-                // ── 3. Upgrade ke TLS socket ───────────────────────
-                val s = sslContext.socketFactory.createSocket(
-                    rawSocket, host, PORT, true
-                ) as SSLSocket
+                // ── 1. Bikin SSLSocket ──────────────────────────────
+                Log.d(TAG, "[1/4] Creating SSLSocket…")
+                val s = sslContext.socketFactory.createSocket() as SSLSocket
                 s.soTimeout = READ_TIMEOUT_MS
+
+                // ── 2. TCP connect ──────────────────────────────────
+                Log.d(TAG, "[2/4] TCP connect ke $host:$PORT (timeout=${CONNECT_TIMEOUT_MS}ms)…")
+                val t0 = System.currentTimeMillis()
+                s.connect(InetSocketAddress(host, PORT), CONNECT_TIMEOUT_MS)
+                val connectMs = System.currentTimeMillis() - t0
+                Log.d(TAG, "[2/4] ✅ TCP connected dalam ${connectMs}ms")
+
+                // ── 3. TLS handshake ────────────────────────────────
+                Log.d(TAG, "[3/4] TLS handshake start…")
+                val t1 = System.currentTimeMillis()
                 s.startHandshake()
+                val hsMs = System.currentTimeMillis() - t1
+                Log.d(TAG, "[3/4] ✅ TLS handshake OK dalam ${hsMs}ms")
 
                 socket = s
                 input = DataInputStream(s.getInputStream())
                 output = DataOutputStream(s.getOutputStream())
-                Log.d(TAG, "TLS handshake OK (client='$clientName')")
 
-                // ── 4. Kirim PairingRequest ────────────────────────
+                // ── 4. Kirim PairingRequest ─────────────────────────
+                Log.d(TAG, "[4/4] Kirim PairingRequest…")
                 val request = PairingMessageProto.PairingMessage.newBuilder()
                     .setProtocolVersion(PROTOCOL_VERSION)
                     .setStatus(STATUS_OK)
@@ -113,9 +111,10 @@ class AndroidTvPairingClient(private val context: Context) {
                     )
                     .build()
                 sendMessage(request)
-                Log.d(TAG, "→ PairingRequest terkirim")
+                Log.d(TAG, "[4/4] ✅ PairingRequest terkirim (${request.serializedSize} bytes)")
 
-                // ── 5. Baca PairingRequestAck ──────────────────────
+                // ── 5. Baca PairingRequestAck ───────────────────────
+                Log.d(TAG, "Menunggu PairingRequestAck…")
                 val ack = readMessage()
                 if (ack == null) {
                     lastError = "TV tidak merespons pairing request"
@@ -134,9 +133,10 @@ class AndroidTvPairingClient(private val context: Context) {
                     disconnect()
                     return@withContext false to lastError
                 }
-                Log.d(TAG, "← PairingRequestAck: server='${ack.pairingRequestAck.serverName}'")
+                Log.d(TAG, "✅ PairingRequestAck: server='${ack.pairingRequestAck.serverName}'")
 
-                // ── 6. Baca PairingOption ──────────────────────────
+                // ── 6. Baca PairingOption ───────────────────────────
+                Log.d(TAG, "Menunggu PairingOption…")
                 val option = readMessage()
                 if (option == null) {
                     lastError = "TV tidak kirim PairingOption"
@@ -150,9 +150,10 @@ class AndroidTvPairingClient(private val context: Context) {
                     disconnect()
                     return@withContext false to lastError
                 }
-                Log.d(TAG, "← PairingOption: input=${option.pairingOption.inputEncodingsList.size}, output=${option.pairingOption.outputEncodingsList.size}")
+                Log.d(TAG, "✅ PairingOption: input=${option.pairingOption.inputEncodingsList.size}, output=${option.pairingOption.outputEncodingsList.size}")
 
-                // ── 7. Kirim PairingConfiguration ──────────────────
+                // ── 7. Kirim PairingConfiguration ───────────────────
+                Log.d(TAG, "Kirim PairingConfiguration…")
                 val encoding = PairingMessageProto.PairingEncoding.newBuilder()
                     .setType(ENC_ALPHANUMERIC)
                     .setSymbolLength(SYMBOL_LENGTH)
@@ -169,9 +170,10 @@ class AndroidTvPairingClient(private val context: Context) {
                     )
                     .build()
                 sendMessage(config)
-                Log.d(TAG, "→ PairingConfiguration terkirim")
+                Log.d(TAG, "✅ PairingConfiguration terkirim")
 
-                // ── 8. Baca PairingConfigurationAck ────────────────
+                // ── 8. Baca PairingConfigurationAck ─────────────────
+                Log.d(TAG, "Menunggu PairingConfigurationAck…")
                 val configAck = readMessage()
                 if (configAck == null) {
                     lastError = "TV tidak balas PairingConfiguration"
@@ -186,25 +188,25 @@ class AndroidTvPairingClient(private val context: Context) {
                     return@withContext false to lastError
                 }
 
-                Log.d(TAG, "← PairingConfigurationAck — TV menampilkan kode")
+                Log.d(TAG, "========== ✅ PAIRING READY — TV tampilkan kode ==========")
                 true to "Masukkan kode yang tampil di layar TV"
             } catch (e: java.net.SocketTimeoutException) {
-                Log.e(TAG, "TIMEOUT: ${e.message}")
+                Log.e(TAG, "❌ TIMEOUT: ${e.message}")
                 lastError = "Timeout connect ke TV (${CONNECT_TIMEOUT_MS / 1000}s). Cek: HP & TV di WiFi sama? AP Isolation OFF?"
                 disconnect()
                 false to lastError
             } catch (e: java.net.ConnectException) {
-                Log.e(TAG, "CONNECTION REFUSED: ${e.message}")
+                Log.e(TAG, "❌ CONNECTION REFUSED: ${e.message}")
                 lastError = "TV tolak koneksi (port $PORT). Kemungkinan: firewall TV / TV di deep sleep"
                 disconnect()
                 false to lastError
             } catch (e: javax.net.ssl.SSLException) {
-                Log.e(TAG, "SSL ERROR: ${e.message}")
-                lastError = "TLS handshake gagal: ${e.message}"
+                Log.e(TAG, "❌ SSL ERROR: ${e.message}")
+                lastError = "TLS gagal: ${e.message}"
                 disconnect()
                 false to lastError
             } catch (e: Exception) {
-                Log.e(TAG, "ERROR: ${e::class.simpleName} — ${e.message}")
+                Log.e(TAG, "❌ ERROR: ${e::class.simpleName} — ${e.message}")
                 e.printStackTrace()
                 lastError = "Error: ${e.message}"
                 disconnect()
@@ -281,28 +283,6 @@ class AndroidTvPairingClient(private val context: Context) {
         }
     }
 
-    /**
-     * Bind socket ke WiFi network secara eksplisit.
-     * Menghindari Android pakai data seluler untuk IP LAN.
-     */
-    private fun bindToWifiNetwork(socket: Socket) {
-        try {
-            val cm = context.getSystemService(Context.CONNECTIVITY_SERVICE) as ConnectivityManager
-            val wifiNetwork = cm.allNetworks.firstOrNull { network ->
-                val caps = cm.getNetworkCapabilities(network) ?: return@firstOrNull false
-                caps.hasTransport(NetworkCapabilities.TRANSPORT_WIFI)
-            }
-            if (wifiNetwork != null) {
-                wifiNetwork.bindSocket(socket)
-                Log.d(TAG, "Socket di-bind ke WiFi network")
-            } else {
-                Log.w(TAG, "WiFi network tidak ditemukan — pakai default routing")
-            }
-        } catch (e: Exception) {
-            Log.w(TAG, "bindToWifiNetwork error: ${e.message}")
-        }
-    }
-
     fun disconnect() {
         try {
             input?.close()
@@ -313,10 +293,6 @@ class AndroidTvPairingClient(private val context: Context) {
         output = null
         socket = null
     }
-
-    // ==========================================================
-    // INTERNAL
-    // ==========================================================
 
     private fun logMessageFields(label: String, msg: PairingMessageProto.PairingMessage) {
         try {
