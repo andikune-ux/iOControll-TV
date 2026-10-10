@@ -17,8 +17,9 @@ import javax.net.ssl.SSLSocket
  *
  * KUNCI PROTOKOL:
  * - client_name di PairingRequest HARUS == CN pada TLS client cert.
- *   Di-resolve dari TlsHelper.getOrCreateClientName(context) — sumber tunggal.
- * - Kalau mismatch → TV tolak dengan PairingMessage.status = 2.
+ * - Sumber tunggal: TlsHelper.getOrCreateClientName(context).
+ * - Format: string deskriptif persisten ("iOControll Tv") —
+ *   mengikuti pola tronikos/androidtvremote2 (dipakai Home Assistant).
  */
 class AndroidTvPairingClient(private val context: Context) {
 
@@ -80,7 +81,7 @@ class AndroidTvPairingClient(private val context: Context) {
                 input = DataInputStream(s.getInputStream())
                 output = DataOutputStream(s.getOutputStream())
                 Log.d(TAG, "TLS connected ke $host:$PORT")
-                Log.d(TAG, "client_name=$clientName (harus == CN cert)")
+                Log.d(TAG, "client_name='$clientName' (harus == CN cert)")
 
                 // ── 2. Kirim PairingRequest ────────────────────
                 val request = PairingMessageProto.PairingMessage.newBuilder()
@@ -92,7 +93,7 @@ class AndroidTvPairingClient(private val context: Context) {
                     )
                     .build()
                 sendMessage(request)
-                Log.d(TAG, "→ PairingRequest terkirim (service=$SERVICE_NAME, client=$clientName)")
+                Log.d(TAG, "→ PairingRequest (service=$SERVICE_NAME, client=$clientName)")
 
                 // ── 3. Baca PairingRequestAck ──────────────────
                 val ack = readMessage()
@@ -104,7 +105,7 @@ class AndroidTvPairingClient(private val context: Context) {
                 logMessageFields("PairingRequestAck", ack)
 
                 if (ack.status != 0 && ack.status != 200) {
-                    lastError = "TV tolak pairing (status=${ack.status}) — kemungkinan cert CN mismatch"
+                    lastError = "TV tolak pairing (status=${ack.status})"
                     disconnect()
                     return@withContext false to lastError
                 }
@@ -147,7 +148,7 @@ class AndroidTvPairingClient(private val context: Context) {
                     )
                     .build()
                 sendMessage(config)
-                Log.d(TAG, "→ PairingConfiguration terkirim (encoding=$chosen, role=$CLIENT_ROLE)")
+                Log.d(TAG, "→ PairingConfiguration (encoding=$chosen, role=$CLIENT_ROLE)")
 
                 // ── 6. Baca PairingConfigurationAck ────────────
                 val configAck = readMessage()
@@ -164,7 +165,7 @@ class AndroidTvPairingClient(private val context: Context) {
                     return@withContext false to lastError
                 }
 
-                Log.d(TAG, "← PairingConfigurationAck diterima — TV menampilkan kode")
+                Log.d(TAG, "← PairingConfigurationAck — TV menampilkan kode")
                 true to "Masukkan kode yang tampil di layar TV"
             } catch (e: Exception) {
                 e.printStackTrace()
