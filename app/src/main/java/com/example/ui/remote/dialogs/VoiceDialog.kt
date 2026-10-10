@@ -40,7 +40,6 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
@@ -50,20 +49,10 @@ import dev.andikuneiocontroll.ui.theme.DarkBgCard
 import dev.andikuneiocontroll.ui.theme.DarkBgCardElevated
 import dev.andikuneiocontroll.ui.theme.StabiloCyan
 import dev.andikuneiocontroll.ui.theme.StabiloLime
-import dev.andikuneiocontroll.ui.theme.StabiloPink
 import dev.andikuneiocontroll.ui.theme.TextMuted
 import dev.andikuneiocontroll.ui.theme.TextPrimary
 import dev.andikuneiocontroll.ui.theme.TextSecondary
 
-/**
- * VoiceDialog — Dialog voice input untuk kirim teks ke TV.
- *
- * Alur:
- * 1. Dialog terbuka → otomatis launch Google Voice Recognizer
- * 2. User ucapkan perintah
- * 3. Hasil dikirim ke TV via INPUT_TEXT
- * 4. Dialog tutup otomatis
- */
 @Composable
 fun VoiceDialog(
     isSending: Boolean = false,
@@ -71,9 +60,9 @@ fun VoiceDialog(
     onResult: (String) -> Unit,
     onDismiss: () -> Unit
 ) {
-    val context = LocalContext.current
     var voiceResult by remember { mutableStateOf("") }
     var hasLaunched by remember { mutableStateOf(false) }
+    var errorMessage by remember { mutableStateOf("") }
 
     val voiceLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.StartActivityForResult()
@@ -105,8 +94,7 @@ fun VoiceDialog(
                 }
                 voiceLauncher.launch(intent)
             } catch (e: Exception) {
-                // Kalau voice recognizer tidak tersedia
-                voiceResult = "Voice tidak tersedia di HP ini"
+                errorMessage = "Voice tidak tersedia di HP ini"
             }
         }
     }
@@ -122,7 +110,6 @@ fun VoiceDialog(
                 modifier = Modifier.padding(20.dp),
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
-                // Header
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.SpaceBetween,
@@ -153,7 +140,6 @@ fun VoiceDialog(
 
                 Spacer(modifier = Modifier.height(20.dp))
 
-                // Icon mic besar
                 Box(
                     modifier = Modifier
                         .size(96.dp)
@@ -180,11 +166,11 @@ fun VoiceDialog(
 
                 Spacer(modifier = Modifier.height(16.dp))
 
-                // Status
                 Text(
                     text = when {
                         isSending -> "Mengirim ke TV…"
                         statusMessage.isNotBlank() -> statusMessage
+                        errorMessage.isNotBlank() -> errorMessage
                         voiceResult.isNotBlank() -> "Terdengar: \"$voiceResult\""
                         else -> "Silakan ucapkan perintah…"
                     },
@@ -205,7 +191,6 @@ fun VoiceDialog(
 
                 Spacer(modifier = Modifier.height(20.dp))
 
-                // Tombol
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.spacedBy(8.dp)
@@ -222,6 +207,7 @@ fun VoiceDialog(
                     Button(
                         onClick = {
                             try {
+                                errorMessage = ""
                                 val intent = Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH).apply {
                                     putExtra(
                                         RecognizerIntent.EXTRA_LANGUAGE_MODEL,
@@ -231,7 +217,9 @@ fun VoiceDialog(
                                     putExtra(RecognizerIntent.EXTRA_PROMPT, "Ucapkan perintah…")
                                 }
                                 voiceLauncher.launch(intent)
-                            } catch (_: Exception) {}
+                            } catch (e: Exception) {
+                                errorMessage = "Gagal buka voice: ${e.message}"
+                            }
                         },
                         colors = ButtonDefaults.buttonColors(containerColor = StabiloLime),
                         shape = RoundedCornerShape(10.dp),
