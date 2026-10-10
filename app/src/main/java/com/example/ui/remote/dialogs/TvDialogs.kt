@@ -264,7 +264,7 @@ private fun DiscoveredTvItem(tv: DiscoveredTv, onClick: () -> Unit) {
     }
 }
 // ==========================================================
-// 2. PAIRING PIN DIALOG
+// 2. PAIRING CODE DIALOG
 // ==========================================================
 @Composable
 fun PairingPinDialog(
@@ -274,7 +274,7 @@ fun PairingPinDialog(
     onSubmit: (String) -> Unit,
     onCancel: () -> Unit
 ) {
-    var pin by remember { mutableStateOf("") }
+    var code by remember { mutableStateOf("") }
 
     Dialog(onDismissRequest = onCancel) {
         Card(
@@ -292,17 +292,25 @@ fun PairingPinDialog(
                 Text("Pairing", color = TextPrimary, fontWeight = FontWeight.Bold, fontSize = 18.sp)
                 Spacer(modifier = Modifier.height(6.dp))
                 Text(
-                    "TV \"$tvName\" menampilkan PIN.\nMasukkan PIN di bawah:",
+                    "Lihat layar TV \"$tvName\".\nMasukkan kode yang tampil di bawah:",
                     color = TextSecondary, fontSize = 12.sp, textAlign = TextAlign.Center
                 )
                 Spacer(modifier = Modifier.height(16.dp))
 
                 OutlinedTextField(
-                    value = pin,
-                    onValueChange = { if (it.length <= 6 && it.all { c -> c.isDigit() }) pin = it },
-                    label = { Text("PIN 6 digit") },
+                    value = code,
+                    onValueChange = { input ->
+                        // Izinkan huruf & angka, maksimal 6 karakter, uppercase otomatis
+                        val filtered = input.filter { it.isLetterOrDigit() }.uppercase()
+                        if (filtered.length <= 6) code = filtered
+                    },
+                    label = { Text("Kode 6 karakter") },
+                    placeholder = { Text("Contoh: DF0C4B") },
                     singleLine = true,
-                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.NumberPassword),
+                    keyboardOptions = KeyboardOptions(
+                        keyboardType = KeyboardType.Ascii,
+                        capitalization = androidx.compose.ui.text.input.KeyboardCapitalization.Characters
+                    ),
                     colors = OutlinedTextFieldDefaults.colors(
                         focusedBorderColor = StabiloLime,
                         focusedLabelColor = StabiloLime,
@@ -328,10 +336,10 @@ fun PairingPinDialog(
                         Text("Batal", color = TextPrimary)
                     }
                     Button(
-                        onClick = { if (pin.length >= 4) onSubmit(pin) },
+                        onClick = { if (code.length >= 6) onSubmit(code) },
                         colors = ButtonDefaults.buttonColors(containerColor = StabiloLime),
                         shape = RoundedCornerShape(10.dp),
-                        enabled = pin.length >= 4 && !isSubmitting,
+                        enabled = code.length >= 6 && !isSubmitting,
                         modifier = Modifier.weight(1f).height(46.dp)
                     ) {
                         if (isSubmitting) {
