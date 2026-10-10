@@ -15,6 +15,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Backup
+import androidx.compose.material.icons.filled.Build
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.Settings
@@ -26,6 +27,10 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -36,6 +41,7 @@ import androidx.compose.ui.window.Dialog
 import dev.andikuneiocontroll.ui.theme.DarkBgCard
 import dev.andikuneiocontroll.ui.theme.DarkBgCardElevated
 import dev.andikuneiocontroll.ui.theme.StabiloCyan
+import dev.andikuneiocontroll.ui.theme.StabiloLime
 import dev.andikuneiocontroll.ui.theme.StabiloYellow
 import dev.andikuneiocontroll.ui.theme.TextPrimary
 import dev.andikuneiocontroll.ui.theme.TextSecondary
@@ -46,6 +52,9 @@ fun SettingsDialog(
     context: Context,
     onDismiss: () -> Unit
 ) {
+    var showDeveloperPin by remember { mutableStateOf(false) }
+    var showDeveloperOptions by remember { mutableStateOf(false) }
+
     Dialog(onDismissRequest = onDismiss) {
         Card(
             modifier = Modifier.fillMaxWidth().padding(16.dp),
@@ -149,7 +158,51 @@ fun SettingsDialog(
                         fontSize = 15.sp
                     )
                 }
+
+                Spacer(modifier = Modifier.height(10.dp))
+
+                // ── Tombol Opsi Developer (dengan PIN lock)
+                Button(
+                    onClick = { showDeveloperPin = true },
+                    colors = ButtonDefaults.buttonColors(containerColor = DarkBgCardElevated),
+                    border = BorderStroke(1.dp, StabiloLime.copy(alpha = 0.4f)),
+                    shape = RoundedCornerShape(10.dp),
+                    modifier = Modifier.fillMaxWidth().height(52.dp)
+                ) {
+                    Icon(
+                        Icons.Default.Build,
+                        contentDescription = null,
+                        tint = StabiloLime,
+                        modifier = Modifier.size(20.dp)
+                    )
+                    Spacer(modifier = Modifier.width(10.dp))
+                    Text(
+                        "Opsi Developer",
+                        color = TextPrimary,
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 15.sp
+                    )
+                }
             }
+        }
+
+        // PIN Dialog
+        if (showDeveloperPin) {
+            DeveloperPinDialog(
+                onPinCorrect = {
+                    showDeveloperPin = false
+                    showDeveloperOptions = true
+                },
+                onDismiss = { showDeveloperPin = false }
+            )
+        }
+
+        // Developer Options Dialog
+        if (showDeveloperOptions) {
+            DeveloperOptionsDialog(
+                context = context,
+                onDismiss = { showDeveloperOptions = false }
+            )
         }
     }
 }
