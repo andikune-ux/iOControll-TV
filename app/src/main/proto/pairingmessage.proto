@@ -1,20 +1,33 @@
 syntax = "proto3";
 package pairing;
+
 option java_package = "dev.andikuneiocontroll.remote.protocol.androidtv.proto";
 option java_outer_classname = "PairingMessageProto";
 
 // ==========================================================
-// PAIRING MESSAGE WRAPPER
+// PAIRING MESSAGE — sesuai protokol resmi Google TV Pairing
+//
+// Struktur field (WAJIB sesuai urutan ini):
+//   Field 1  = protocol_version   (selalu 2 untuk Remote v2)
+//   Field 2  = status             (200 = OK, 400 = ERROR, dst)
+//   Field 10 = pairing_request
+//   Field 11 = pairing_request_ack
+//   Field 20 = pairing_option
+//   Field 30 = pairing_configuration
+//   Field 31 = pairing_configuration_ack
+//   Field 40 = pairing_secret
+//   Field 41 = pairing_secret_ack
 // ==========================================================
 message PairingMessage {
-  int32 status = 1;
-  PairingRequest pairing_request = 2;
-  PairingRequestAck pairing_request_ack = 3;
-  PairingOption pairing_option = 4;
-  PairingConfiguration pairing_configuration = 5;
-  PairingConfigurationAck pairing_configuration_ack = 6;
-  PairingSecret pairing_secret = 7;
-  PairingSecretAck pairing_secret_ack = 8;
+  uint32 protocol_version = 1;
+  int32 status = 2;
+  PairingRequest pairing_request = 10;
+  PairingRequestAck pairing_request_ack = 11;
+  PairingOption pairing_option = 20;
+  PairingConfiguration pairing_configuration = 30;
+  PairingConfigurationAck pairing_configuration_ack = 31;
+  PairingSecret pairing_secret = 40;
+  PairingSecretAck pairing_secret_ack = 41;
 }
 
 // ==========================================================
@@ -36,16 +49,24 @@ message PairingRequestAck {
 // PAIRING OPTION (dari TV berisi konfigurasi encoding)
 // ==========================================================
 message PairingOption {
-  string input_encodings = 1;
-  string output_encodings = 2;
+  repeated PairingEncoding input_encodings = 1;
+  repeated PairingEncoding output_encodings = 2;
+}
+
+message PairingEncoding {
+  // 0 = UNKNOWN, 1 = ALPHANUMERIC, 2 = NUMERIC,
+  // 3 = HEXADECIMAL, 4 = QRCODE
+  int32 type = 1;
+  uint32 symbol_length = 2;
 }
 
 // ==========================================================
 // PAIRING CONFIGURATION (dikirim HP ke TV)
 // ==========================================================
 message PairingConfiguration {
-  string encoding = 1;
-  string client_role = 2;
+  PairingEncoding encoding = 1;
+  // 0 = UNKNOWN, 1 = INPUT, 2 = OUTPUT
+  int32 client_role = 2;
 }
 
 // ==========================================================
