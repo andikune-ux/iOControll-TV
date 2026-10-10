@@ -16,16 +16,15 @@ import javax.net.ssl.SSLSocket
  * AndroidTvPairingClient — Handle pairing flow Android TV Remote v2.
  *
  * Protokol lengkap sesuai pairingmessage.proto:
- * 1. TLS connect ke TV port 6467
+ * 1. TLS connect ke TV port 6467  (WAJIB IPv4, IPv6 link-local tidak support)
  * 2. HP → TV : PairingRequest (service_name + client_name)
  * 3. TV → HP : PairingRequestAck (server_name)
  * 4. TV → HP : PairingOption (input_encodings + output_encodings)
- * 5. HP → TV : PairingConfiguration (encoding dipilih + client_role="1")
- * 6. TV → HP : PairingConfigurationAck     ← INI yang trigger PIN muncul
- * 7. TV     : TAMPILKAN PIN 6 digit
- * 8. HP → TV : PairingSecret (SPAKE2 dari password=PIN)
+ * 5. HP → TV : PairingConfiguration (encoding + client_role="1")
+ * 6. TV → HP : PairingConfigurationAck   ← trigger PIN muncul di TV
+ * 7. TV     : TAMPILKAN PIN 6 karakter
+ * 8. HP → TV : PairingSecret (SPAKE2)
  * 9. TV → HP : PairingSecretAck
- * 10. HP    : verifikasi + simpan cert TV
  */
 class AndroidTvPairingClient(private val context: Context) {
 
@@ -34,7 +33,16 @@ class AndroidTvPairingClient(private val context: Context) {
         private const val PORT = 6467
         private const val SERVICE_NAME = "atvremote"
         private const val CLIENT_NAME = "atvremote"
-        private const val CLIENT_ROLE = "1"  // 1 = HP sebagai client
+        private const val CLIENT_ROLE = "1"
+
+        /** Cek apakah host adalah IPv6 (mengandung ':') */
+        private fun isIpv6(host: String): Boolean = host.contains(":")
+
+        /** Cek apakah host IPv6 link-local (fe80::/10) */
+        private fun isIpv6LinkLocal(host: String): Boolean {
+            val lower = host.lowercase()
+            return lower.startsWith("fe80:") || lower.startsWith("fe80%")
+        }
     }
 
     private var socket: SSLSocket? = null
@@ -51,12 +59,27 @@ class AndroidTvPairingClient(private val context: Context) {
         private set
 
     /**
-     * Langkah 1 — Buka koneksi TLS, jalan sampai PairingConfigurationAck.
-     * Setelah fungsi ini return true, TV SUDAH menampilkan PIN.
+     * Langkah 1 — Buka koneksi TLS, kirim request, tunggu PairingConfigurationAck.
+     * Setelah fungsi ini return true, TV SUDAH menampilkan kode.
      */
     suspend fun startPairing(host: String): Pair<Boolean, String> {
         return withContext(Dispatchers.IO) {
             try {
+                // ── Validasi host ──────────────────────────────
+                if (host.isBlank()) {
+                    lastError = "Host kosong"
+                    return@withContext false to lastError
+                }
+                if (isIpv6(host)) {
+                    lastError = if (isIpv6LinkLocal(host)) {
+                        "Alamat IPv6 link-local tidak didukung. Pilih TV yang pakai IPv4 (contoh: 192.168.x.x)"
+                    } else {
+                        "Alamat IPv6 tidak didukung. Pilih TV yang pakai IPv4."
+                    }
+                    Log.w(TAG, "Tolak host IPv6: $host")
+                    return@withContext false to lastError
+                }
+
                 TlsHelper.init()
                 val sslContext: SSLContext = TlsHelper.buildSslContext(context)
 
@@ -67,6 +90,7 @@ class AndroidTvPairingClient(private val context: Context) {
                 socket = s
                 input = DataInputStream(s.getInputStream())
                 output = DataOutputStream(s.getOutputStream())
+                Log.d(TAG, "TLS connected ke $host:$PORT")
 
                 // ── 2. Kirim PairingRequest ────────────────────
                 val request = PairingMessageProto.PairingMessage.newBuilder()
@@ -87,17 +111,32 @@ class AndroidTvPairingClient(private val context: Context) {
                     disconnect()
                     return@withContext false to lastError
                 }
+                logMessageFields("PairingRequestAck", ack)
+
                 if (!ack.hasPairingRequestAck()) {
-                    lastError = "TV menolak pairing request"
+                    lastError = "TV kirim message tidak dikenal (status=${ack.status})"
                     disconnect()
                     return@withContext false to lastError
                 }
-                Log.d(TAG, "← PairingRequestAck: server=${ack.pairingRequestAck.serverName}")
+                // Cek status — 0 = OK (unset), 200 = OK
+                if (ack.status != 0 && ack.status != 200) {
+                    lastError = "TV tolak pairing (status=${ack.status})"
+                    disconnect()
+                    return@withContext false to lastError
+                }
+                Log.d(TAG, "← PairingRequestAck: server='${ack.pairingRequestAck.serverName}'")
 
                 // ── 4. Baca PairingOption ──────────────────────
                 val option = readMessage()
-                if (option == null || !option.hasPairingOption()) {
-                    lastError = "TV tidak mengirim PairingOption"
+                if (option == null) {
+                    lastError = "TV tidak kirim PairingOption"
+                    disconnect()
+                    return@withContext false to lastError
+                }
+                logMessageFields("PairingOption", option)
+
+                if (!option.hasPairingOption()) {
+                    lastError = "Respons TV bukan PairingOption (status=${option.status})"
                     disconnect()
                     return@withContext false to lastError
                 }
@@ -105,7 +144,6 @@ class AndroidTvPairingClient(private val context: Context) {
                 val outputEnc = option.pairingOption.outputEncodings
                 Log.d(TAG, "← PairingOption: input='$inputEnc' output='$outputEnc'")
 
-                // Pilih encoding dari yang TV sediakan
                 val chosen = pickEncoding(inputEnc, outputEnc)
                 Log.d(TAG, "Encoding dipilih: $chosen")
 
@@ -122,22 +160,22 @@ class AndroidTvPairingClient(private val context: Context) {
                 Log.d(TAG, "→ PairingConfiguration terkirim (encoding=$chosen)")
 
                 // ── 6. Baca PairingConfigurationAck ────────────
-                //     Setelah ack ini TV menampilkan PIN di layar
                 val configAck = readMessage()
                 if (configAck == null) {
                     lastError = "TV tidak balas PairingConfiguration"
                     disconnect()
                     return@withContext false to lastError
                 }
+                logMessageFields("PairingConfigurationAck", configAck)
+
                 if (!configAck.hasPairingConfigurationAck()) {
-                    lastError = "Respons TV bukan PairingConfigurationAck"
+                    lastError = "Respons TV bukan PairingConfigurationAck (status=${configAck.status})"
                     disconnect()
                     return@withContext false to lastError
                 }
-                Log.d(TAG, "← PairingConfigurationAck diterima — TV menampilkan PIN")
 
-                // ── 7. Siap terima PIN ─────────────────────────
-                true to "Masukkan PIN yang tampil di layar TV"
+                Log.d(TAG, "← PairingConfigurationAck diterima — TV menampilkan kode")
+                true to "Masukkan kode yang tampil di layar TV"
             } catch (e: Exception) {
                 e.printStackTrace()
                 lastError = "Error connect: ${e.message}"
@@ -148,7 +186,7 @@ class AndroidTvPairingClient(private val context: Context) {
     }
 
     /**
-     * Langkah 2 — Kirim PIN ke TV (SPAKE2).
+     * Langkah 2 — Kirim kode dari TV ke HP (SPAKE2).
      */
     suspend fun sendPin(pin: String): Pair<Boolean, String> {
         return withContext(Dispatchers.IO) {
@@ -178,8 +216,15 @@ class AndroidTvPairingClient(private val context: Context) {
                 Log.d(TAG, "→ PairingSecret terkirim")
 
                 val response = readMessage()
-                if (response == null || !response.hasPairingSecretAck()) {
-                    lastError = "TV tolak pairing (PIN salah?)"
+                if (response == null) {
+                    lastError = "TV tidak balas PairingSecret"
+                    disconnect()
+                    return@withContext false to lastError
+                }
+                logMessageFields("PairingSecretAck", response)
+
+                if (!response.hasPairingSecretAck()) {
+                    lastError = "TV tolak pairing (kode salah?) status=${response.status}"
                     disconnect()
                     return@withContext false to lastError
                 }
@@ -227,19 +272,33 @@ class AndroidTvPairingClient(private val context: Context) {
     // INTERNAL
     // ==========================================================
 
-    /**
-     * Pilih encoding yang akan dikirim ke TV.
-     * TV bisa kirim CSV (mis. "HEX,BASE64") — kita prioritaskan HEX.
-     */
+    /** Pilih encoding dari yang TV sediakan — prioritas HEX. */
     private fun pickEncoding(inputRaw: String, outputRaw: String): String {
         val all = (inputRaw + "," + outputRaw)
             .split(",")
             .map { it.trim() }
             .filter { it.isNotEmpty() }
-        // Prioritas HEX
         all.firstOrNull { it.equals("HEX", ignoreCase = true) }?.let { return "HEX" }
-        // Fallback: yang pertama tersedia
         return all.firstOrNull() ?: "HEX"
+    }
+
+    /** Log semua field PairingMessage yang terisi — untuk debugging. */
+    private fun logMessageFields(label: String, msg: PairingMessageProto.PairingMessage) {
+        try {
+            val fields = buildString {
+                append("status=").append(msg.status)
+                if (msg.hasPairingRequest()) append(", request=yes")
+                if (msg.hasPairingRequestAck()) append(", ack=yes")
+                if (msg.hasPairingOption()) append(", option=yes")
+                if (msg.hasPairingConfiguration()) append(", config=yes")
+                if (msg.hasPairingConfigurationAck()) append(", configAck=yes")
+                if (msg.hasPairingSecret()) append(", secret=yes")
+                if (msg.hasPairingSecretAck()) append(", secretAck=yes")
+            }
+            Log.d(TAG, "← $label {$fields}")
+        } catch (e: Exception) {
+            Log.w(TAG, "logMessageFields error: ${e.message}")
+        }
     }
 
     private fun sendMessage(message: PairingMessageProto.PairingMessage) {
