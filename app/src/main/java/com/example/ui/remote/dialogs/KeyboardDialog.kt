@@ -2,7 +2,6 @@ package dev.andikuneiocontroll.ui.remote.dialogs
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -52,20 +51,10 @@ import dev.andikuneiocontroll.ui.theme.DarkBgCard
 import dev.andikuneiocontroll.ui.theme.DarkBgCardElevated
 import dev.andikuneiocontroll.ui.theme.StabiloCyan
 import dev.andikuneiocontroll.ui.theme.StabiloLime
-import dev.andikuneiocontroll.ui.theme.StabiloPink
 import dev.andikuneiocontroll.ui.theme.StabiloYellow
 import dev.andikuneiocontroll.ui.theme.TextPrimary
 import dev.andikuneiocontroll.ui.theme.TextSecondary
 
-/**
- * KeyboardDialog — Dialog untuk kirim text manual ke TV.
- *
- * Fitur:
- * - Input text di HP → kirim ke TV via INPUT_TEXT
- * - Tombol Send (Enter)
- * - Tombol Backspace
- * - Tombol Clear
- */
 @Composable
 fun KeyboardDialog(
     isSending: Boolean = false,
@@ -85,7 +74,6 @@ fun KeyboardDialog(
             shape = RoundedCornerShape(18.dp)
         ) {
             Column(modifier = Modifier.padding(20.dp)) {
-                // Header
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     verticalAlignment = Alignment.CenterVertically
@@ -120,7 +108,6 @@ fun KeyboardDialog(
 
                 Spacer(modifier = Modifier.height(16.dp))
 
-                // Text input
                 OutlinedTextField(
                     value = textInput,
                     onValueChange = { textInput = it },
@@ -148,7 +135,6 @@ fun KeyboardDialog(
                     modifier = Modifier.fillMaxWidth()
                 )
 
-                // Status
                 if (isSending || statusMessage.isNotBlank()) {
                     Spacer(modifier = Modifier.height(8.dp))
                     Row(verticalAlignment = Alignment.CenterVertically) {
@@ -170,7 +156,6 @@ fun KeyboardDialog(
 
                 Spacer(modifier = Modifier.height(16.dp))
 
-                // Row tombol cepat: Backspace, Enter
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.spacedBy(8.dp)
@@ -212,7 +197,6 @@ fun KeyboardDialog(
 
                 Spacer(modifier = Modifier.height(8.dp))
 
-                // Tombol utama: Kirim + Tutup
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.spacedBy(8.dp)
@@ -251,7 +235,6 @@ fun KeyboardDialog(
 
                 Spacer(modifier = Modifier.height(12.dp))
 
-                // Info
                 Text(
                     text = "Teks akan dikirim ke kolom input yang aktif di TV.",
                     color = TextSecondary.copy(alpha = 0.7f),
