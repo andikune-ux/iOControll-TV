@@ -13,7 +13,6 @@ import java.security.SecureRandom
 import java.security.Security
 import java.security.cert.X509Certificate
 import java.util.Date
-import java.util.UUID
 import javax.net.ssl.KeyManagerFactory
 import javax.net.ssl.SSLContext
 import javax.net.ssl.TrustManager
@@ -30,17 +29,20 @@ import org.bouncycastle.operator.jcajce.JcaContentSignerBuilder
 /**
  * TlsHelper — Helper TLS untuk Android TV Remote v2.
  *
- * KUNCI PROTOKOL:
- * - CN (Common Name) cert client HARUS SAMA dengan client_name di PairingRequest.
- * - Kalau beda → TV tolak pairing dengan PairingMessage.status = 2.
- * - Cert CN & client_name = hex unik per-install (persistent di SharedPreferences).
+ * Mengikuti pola yang dipakai Home Assistant (tronikos/androidtvremote2):
+ * - client_name: string deskriptif & PERSISTEN ("iOControll Tv")
+ * - CN cert client HARUS SAMA dengan client_name di PairingRequest
+ *   (kalau beda → TV tolak dengan PairingMessage.status = 2)
  */
 object TlsHelper {
 
     private const val TAG = "TlsHelper"
 
-    // Bump versi → paksa regenerasi cert baru (buang cert lama yang CN-nya mismatch)
-    private const val KEYSTORE_FILE = "atv_client_v2.p12"
+    // Nama client — deskriptif & tetap
+    private const val DEFAULT_CLIENT_NAME = "iOControll Tv"
+
+    // v3 → paksa regenerate cert (buang v1/v2 yang format client_name-nya beda)
+    private const val KEYSTORE_FILE = "atv_client_v3.p12"
     private const val KEYSTORE_PASSWORD = "iocontroll_atv"
     private const val CERT_ALIAS = "atv_client"
     private const val CERT_VALIDITY_YEARS = 10
@@ -53,9 +55,6 @@ object TlsHelper {
     @Volatile
     private var initialized = false
 
-    /**
-     * Init BouncyCastle provider.
-     */
     fun init() {
         if (!initialized) {
             try {
@@ -67,23 +66,22 @@ object TlsHelper {
     }
 
     // ==========================================================
-    // CLIENT NAME — sumber tunggal untuk cert CN & PairingRequest
+    // CLIENT NAME — deskriptif, persisten, sumber tunggal
     // ==========================================================
 
     /**
-     * Dapatkan (atau generate baru) client_name unik untuk install ini.
-     * Format: 32 hex char (16 byte) — sama seperti Google TV official app.
-     * Persisten di SharedPreferences supaya konsisten setelah pairing.
+     * Dapatkan (atau set default) client_name unik untuk install ini.
+     * Dipakai BAIK untuk CN cert MAUPUN PairingRequest.client_name.
      */
     fun getOrCreateClientName(context: Context): String {
         val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
         val existing = prefs.getString(KEY_CLIENT_NAME, null)
         if (!existing.isNullOrBlank()) return existing
 
-        val name = UUID.randomUUID().toString().replace("-", "").lowercase()
-        prefs.edit().putString(KEY_CLIENT_NAME, name).apply()
-        Log.d(TAG, "client_name baru: $name")
-        return name
+        // Pakai nama deskriptif (sama seperti "Home Assistant" di HA)
+        prefs.edit().putString(KEY_CLIENT_NAME, DEFAULT_CLIENT_NAME).apply()
+        Log.d(TAG, "client_name diset: $DEFAULT_CLIENT_NAME")
+        return DEFAULT_CLIENT_NAME
     }
 
     // ==========================================================
@@ -107,7 +105,6 @@ object TlsHelper {
             }
         }
 
-        // Generate baru
         keyStore.load(null, null)
         val keyPair = generateRsaKeyPair()
         val cert = generateSelfSignedCert(context, keyPair)
@@ -123,7 +120,7 @@ object TlsHelper {
             keyStore.store(output, KEYSTORE_PASSWORD.toCharArray())
         }
 
-        Log.d(TAG, "Keystore baru dibuat, CN=${(cert.subjectX500Principal.name)}")
+        Log.d(TAG, "Keystore baru, subject='${cert.subjectX500Principal.name}'")
         return keyStore
     }
 
@@ -147,11 +144,6 @@ object TlsHelper {
         }
     }
 
-    /**
-     * Build SSLContext untuk TLS handshake ke TV.
-     * - Pakai client cert (CN = client_name)
-     * - Trust semua server cert (TV pakai self-signed)
-     */
     fun buildSslContext(context: Context): SSLContext {
         init()
         val keyStore = getOrCreateKeyStore(context)
@@ -171,13 +163,12 @@ object TlsHelper {
     }
 
     // ==========================================================
-    // SERVER CERT — cert TV setelah pairing sukses
+    // SERVER CERT
     // ==========================================================
 
     fun saveServerCertificate(context: Context, cert: X509Certificate) {
         try {
-            val file = File(context.filesDir, CERT_FILE)
-            file.writeBytes(cert.encoded)
+            File(context.filesDir, CERT_FILE).writeBytes(cert.encoded)
         } catch (e: Exception) {
             e.printStackTrace()
         }
@@ -204,6 +195,9 @@ object TlsHelper {
         try {
             File(context.filesDir, CERT_FILE).delete()
             File(context.filesDir, KEYSTORE_FILE).delete()
+            // Hapus juga v1 & v2 lama kalau ada
+            File(context.filesDir, "atv_client.p12").delete()
+            File(context.filesDir, "atv_client_v2.p12").delete()
             context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
                 .edit().remove(KEY_CLIENT_NAME).apply()
         } catch (e: Exception) {
@@ -227,8 +221,7 @@ object TlsHelper {
 
     /**
      * Generate self-signed cert.
-     *
-     * WAJIB: CN = client_name (kalau beda, TV tolak pairing dengan status=2).
+     * WAJIB: CN = client_name (kalau beda → status=2 dari TV).
      */
     private fun generateSelfSignedCert(context: Context, keyPair: KeyPair): X509Certificate {
         val clientName = getOrCreateClientName(context)
@@ -237,24 +230,17 @@ object TlsHelper {
         val startDate = Date(now - 24 * 60 * 60 * 1000L)
         val endDate = Date(now + CERT_VALIDITY_YEARS.toLong() * 365 * 24 * 60 * 60 * 1000L)
 
-        // CN = client_name (kunci!)
+        // CN = client_name  (KUNCI)
         val subject = X500Name("CN=$clientName, O=androidtvremote2, OU=Android, C=US")
-
         val serial = BigInteger.valueOf(now)
 
         val builder = JcaX509v3CertificateBuilder(
-            subject,
-            serial,
-            startDate,
-            endDate,
-            subject,
-            keyPair.public
+            subject, serial, startDate, endDate, subject, keyPair.public
         )
 
         builder.addExtension(Extension.basicConstraints, true, BasicConstraints(false))
         builder.addExtension(
-            Extension.keyUsage,
-            true,
+            Extension.keyUsage, true,
             KeyUsage(KeyUsage.digitalSignature or KeyUsage.keyEncipherment)
         )
 
