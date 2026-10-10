@@ -24,10 +24,12 @@ message RemoteSetVolumeLevel {
 
 message RemoteStart { bool started = 1; }
 message RemoteVoiceEnd { int32 session_id = 1; }
+
 message RemoteVoicePayload {
   int32 session_id = 1;
   bytes samples = 2;
 }
+
 message RemoteVoiceBegin {
   int32 session_id = 1;
   string package_name = 2;
@@ -376,7 +378,7 @@ enum RemoteKeyCode {
 }
 
 // ==========================================================
-// MAIN WRAPPER MESSAGE
+// MAIN WRAPPER
 // ==========================================================
 message RemoteMessage {
   RemoteKeyCode remote_key_code = 1;
