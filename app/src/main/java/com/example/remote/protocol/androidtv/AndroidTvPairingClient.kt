@@ -93,7 +93,7 @@ class AndroidTvPairingClient(private val context: Context) {
                         .setPairingConfiguration(
                             PairingMessageProto.PairingConfiguration.newBuilder()
                                 .setEncoding("HEX")
-                                .setClientRole(1)
+                                .setClientRole("1")
                                 .build()
                         )
                         .build()
