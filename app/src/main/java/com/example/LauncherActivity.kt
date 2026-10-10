@@ -1,19 +1,17 @@
 package dev.andikuneiocontroll
 
 import android.content.Intent
+import android.content.pm.ActivityInfo
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import dev.andikuneiocontroll.util.CrashHandler
+import dev.andikuneiocontroll.util.DeviceTypeHelper
 
 /**
  * LauncherActivity — Entry point aplikasi.
  *
- * Cek crash log SEBELUM buka MainActivity:
- * - Ada crash → buka CrashViewerActivity (isolated, anti-crash)
- * - Tidak ada crash → buka MainActivity
- *
- * Activity ini SANGAAT SEDERHANA — hanya cek file.
- * Tidak ada Room, ViewModel, atau dependency apapun.
+ * - Deteksi TV / HP → set orientasi
+ * - Cek crash log sebelum buka MainActivity
  */
 class LauncherActivity : ComponentActivity() {
 
@@ -24,7 +22,14 @@ class LauncherActivity : ComponentActivity() {
         try {
             CrashHandler.install(this)
         } catch (e: Exception) {
-            // ignore
+            e.printStackTrace()
+        }
+
+        // Set orientasi berdasarkan device type
+        requestedOrientation = try {
+            DeviceTypeHelper.getPreferredOrientation(this)
+        } catch (e: Exception) {
+            ActivityInfo.SCREEN_ORIENTATION_PORTRAIT
         }
 
         // Cek crash file
@@ -35,10 +40,8 @@ class LauncherActivity : ComponentActivity() {
         }
 
         val nextIntent = if (crashFile != null && crashFile.exists()) {
-            // Ada crash → buka CrashViewerActivity
             Intent(this, CrashViewerActivity::class.java)
         } else {
-            // Tidak ada crash → buka MainActivity
             Intent(this, MainActivity::class.java)
         }
 
