@@ -161,4 +161,5 @@ dependencies {
     implementation(libs.libadb.android)
     implementation(libs.conscrypt.android)
     implementation(libs.bcprov.jdk18on)
+    implementation(libs.bcpkix.jdk18on)
 }
