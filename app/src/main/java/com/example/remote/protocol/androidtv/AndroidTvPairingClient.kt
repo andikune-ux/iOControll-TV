@@ -15,16 +15,16 @@ import javax.net.ssl.SSLSocket
 /**
  * AndroidTvPairingClient — Handle pairing flow Android TV Remote v2.
  *
- * Flow:
+ * Urutan protokol yang BENAR (Remote v2):
  * 1. TLS connect ke TV port 6467
- * 2. Kirim PairingRequest (service_name + client_name)
- * 3. Terima PairingRequestAck dari TV
- * 4. TV kirim PairingOption (encoding config)
- * 5. HP kirim PairingConfiguration
- * 6. TV tampilkan PIN 6 digit di layar
- * 7. HP kirim PairingSecret (SPAKE2 message dari password=PIN)
- * 8. TV kirim PairingSecretAck (SPAKE2 message TV)
- * 9. HP verifikasi + simpan cert TV
+ * 2. HP → TV  : PairingRequest (service_name + client_name)
+ * 3. TV → HP  : PairingRequestAck
+ * 4. TV → HP  : PairingOption (encoding yang TV terima)
+ * 5. HP → TV  : PairingConfiguration (encoding + client_role)
+ * 6. TV       : TAMPILKAN PIN 6 digit di layar
+ * 7. HP → TV  : PairingSecret (SPAKE2 message dari password=PIN)
+ * 8. TV → HP  : PairingSecretAck (SPAKE2 message TV)
+ * 9. HP       : verifikasi + simpan cert TV
  */
 class AndroidTvPairingClient(private val context: Context) {
 
@@ -33,6 +33,8 @@ class AndroidTvPairingClient(private val context: Context) {
         private const val PORT = 6467
         private const val SERVICE_NAME = "atvremote"
         private const val CLIENT_NAME = "atvremote"
+        // Timeout per-message (ms)
+        private const val READ_TIMEOUT_MS = 5000
     }
 
     private var socket: SSLSocket? = null
@@ -49,7 +51,8 @@ class AndroidTvPairingClient(private val context: Context) {
         private set
 
     /**
-     * Langkah 1 — Buka koneksi TLS + kirim pairing request.
+     * Langkah 1 — Buka koneksi TLS + kirim pairing request + tunggu PairingOption.
+     * Setelah fungsi ini return true, TV SUDAH menampilkan PIN di layar.
      */
     suspend fun startPairing(host: String): Pair<Boolean, String> {
         return withContext(Dispatchers.IO) {
@@ -77,30 +80,71 @@ class AndroidTvPairingClient(private val context: Context) {
                             .build()
                     )
                     .build()
-
                 sendMessage(request)
 
-                // 4. Tunggu PairingRequestAck + PairingOption dari TV
-                val response = readMessage()
-                if (response == null) {
-                    lastError = "TV tidak merespons"
+                // 4. Baca PairingRequestAck dari TV
+                val ack = readMessage()
+                if (ack == null) {
+                    lastError = "TV tidak merespons pairing request"
+                    disconnect()
+                    return@withContext false to lastError
+                }
+                if (!ack.hasPairingRequestAck()) {
+                    lastError = "TV menolak pairing request"
+                    disconnect()
+                    return@withContext false to lastError
+                }
+                Log.d(TAG, "PairingRequestAck diterima")
+
+                // 5. Baca PairingOption dari TV — INI LANGKAH YANG HILANG SEBELUMNYA
+                val option = readMessage()
+                if (option == null) {
+                    lastError = "TV tidak mengirim PairingOption"
+                    disconnect()
+                    return@withContext false to lastError
+                }
+                if (!option.hasPairingOption()) {
+                    lastError = "Respons TV bukan PairingOption"
+                    disconnect()
                     return@withContext false to lastError
                 }
 
-                // 5. Kalau TV minta konfigurasi, kirim PairingConfiguration
-                if (response.hasPairingRequestAck()) {
-                    val config = PairingMessageProto.PairingMessage.newBuilder()
-                        .setPairingConfiguration(
-                            PairingMessageProto.PairingConfiguration.newBuilder()
-                                .setEncoding("HEX")
-                                .setClientRole("1")
-                                .build()
-                        )
-                        .build()
-                    sendMessage(config)
+                // 6. Ambil encoding yang TV sediakan (fallback "HEX")
+                val encodingFromTv = try {
+                    val enc = option.pairingOption.encoding
+                    if (enc.isNullOrEmpty()) "HEX" else enc
+                } catch (_: Exception) {
+                    "HEX"
                 }
+                Log.d(TAG, "PairingOption encoding=$encodingFromTv")
 
-                true to "Menunggu kode pairing dari TV"
+                // 7. Kirim PairingConfiguration pakai encoding dari TV
+                val config = PairingMessageProto.PairingMessage.newBuilder()
+                    .setPairingConfiguration(
+                        PairingMessageProto.PairingConfiguration.newBuilder()
+                            .setEncoding(encodingFromTv)
+                            .setClientRole("1")
+                            .build()
+                    )
+                    .build()
+                sendMessage(config)
+
+                // 8. Baca respons TV — biasanya PairingOption lagi,
+                //    atau TV sudah langsung menampilkan PIN.
+                //    Kalau dapat PairingOption/ack, anggap sukses.
+                val confirm = readMessage()
+                if (confirm == null) {
+                    lastError = "TV tidak konfirmasi PairingConfiguration"
+                    disconnect()
+                    return@withContext false to lastError
+                }
+                Log.d(TAG, "Respons setelah config: " +
+                    "ack=${confirm.hasPairingRequestAck()}, " +
+                    "option=${confirm.hasPairingOption()}, " +
+                    "secretAck=${confirm.hasPairingSecretAck()}")
+
+                // 9. Sampai sini TV sudah menampilkan PIN di layar
+                true to "Masukkan PIN yang tampil di layar TV"
             } catch (e: Exception) {
                 e.printStackTrace()
                 lastError = "Error connect: ${e.message}"
@@ -130,7 +174,7 @@ class AndroidTvPairingClient(private val context: Context) {
                 )
                 spake2 = s2
 
-                // 2. Generate SPAKE2 message pertama (X + w*M)
+                // 2. Generate SPAKE2 message pertama
                 val spakeMsg = s2.start()
 
                 // 3. Kirim PairingSecret ke TV
@@ -141,7 +185,6 @@ class AndroidTvPairingClient(private val context: Context) {
                             .build()
                     )
                     .build()
-
                 sendMessage(secretMsg)
 
                 // 4. Tunggu PairingSecretAck dari TV
@@ -198,7 +241,6 @@ class AndroidTvPairingClient(private val context: Context) {
 
     private fun sendMessage(message: PairingMessageProto.PairingMessage) {
         val bytes = message.toByteArray()
-        // Protobuf length-delimited (varint length + data)
         writeVarint(bytes.size)
         output?.write(bytes)
         output?.flush()
