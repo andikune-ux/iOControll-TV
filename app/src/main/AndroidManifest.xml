@@ -39,7 +39,7 @@
         android:usesCleartextTraffic="true"
         tools:targetApi="34">
 
-        <!-- ==================== LAUNCHER (Cek crash dulu) ==================== -->
+        <!-- Launcher — orientasi di-set programmatically -->
         <activity
             android:name=".LauncherActivity"
             android:exported="true"
@@ -51,23 +51,23 @@
             </intent-filter>
         </activity>
 
-        <!-- ==================== CRASH VIEWER (isolated) ==================== -->
+        <!-- Crash Viewer — selalu portrait -->
         <activity
             android:name=".CrashViewerActivity"
             android:exported="false"
             android:theme="@style/Theme.IOControllTv"
+            android:screenOrientation="portrait"
             android:excludeFromRecents="true" />
 
-        <!-- ==================== MAIN ACTIVITY ==================== -->
+        <!-- MainActivity — orientasi di-set programmatically -->
         <activity
             android:name=".MainActivity"
             android:exported="false"
             android:configChanges="orientation|screenSize|screenLayout|keyboardHidden|uiMode"
-            android:screenOrientation="sensorLandscape"
             android:launchMode="singleTask"
             android:theme="@style/Theme.IOControllTv" />
 
-        <!-- ==================== SERVICES ==================== -->
+        <!-- Services -->
         <service
             android:name=".server.WifiFileServerService"
             android:enabled="true"
@@ -88,7 +88,7 @@
                 android:value="remote_tv_server" />
         </service>
 
-        <!-- ==================== BROADCAST RECEIVER ==================== -->
+        <!-- Boot Receiver -->
         <receiver
             android:name=".receiver.BootReceiver"
             android:enabled="true"
@@ -99,7 +99,7 @@
             </intent-filter>
         </receiver>
 
-        <!-- ==================== FILE PROVIDER ==================== -->
+        <!-- File Provider -->
         <provider
             android:name="androidx.core.content.FileProvider"
             android:authorities="${applicationId}.fileprovider"
