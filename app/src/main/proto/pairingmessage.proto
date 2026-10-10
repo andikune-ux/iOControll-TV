@@ -1,0 +1,68 @@
+syntax = "proto3";
+package pairing;
+option java_package = "dev.andikuneiocontroll.remote.protocol.androidtv.proto";
+option java_outer_classname = "PairingMessageProto";
+
+// ==========================================================
+// PAIRING MESSAGE WRAPPER
+// ==========================================================
+message PairingMessage {
+  int32 status = 1;
+  PairingRequest pairing_request = 2;
+  PairingRequestAck pairing_request_ack = 3;
+  PairingOption pairing_option = 4;
+  PairingConfiguration pairing_configuration = 5;
+  PairingConfigurationAck pairing_configuration_ack = 6;
+  PairingSecret pairing_secret = 7;
+  PairingSecretAck pairing_secret_ack = 8;
+}
+
+// ==========================================================
+// PAIRING REQUEST (dikirim HP ke TV)
+// ==========================================================
+message PairingRequest {
+  string service_name = 1;
+  string client_name = 2;
+}
+
+// ==========================================================
+// PAIRING REQUEST ACK (dari TV)
+// ==========================================================
+message PairingRequestAck {
+  string server_name = 1;
+}
+
+// ==========================================================
+// PAIRING OPTION (dari TV berisi konfigurasi encoding)
+// ==========================================================
+message PairingOption {
+  string input_encodings = 1;
+  string output_encodings = 2;
+}
+
+// ==========================================================
+// PAIRING CONFIGURATION (dikirim HP ke TV)
+// ==========================================================
+message PairingConfiguration {
+  string encoding = 1;
+  string client_role = 2;
+}
+
+// ==========================================================
+// PAIRING CONFIGURATION ACK (dari TV)
+// ==========================================================
+message PairingConfigurationAck { }
+
+// ==========================================================
+// PAIRING SECRET (dikirim HP ke TV berisi SPAKE2 message)
+// ==========================================================
+message PairingSecret {
+  bytes secret = 1;
+}
+
+// ==========================================================
+// PAIRING SECRET ACK (dari TV berisi SPAKE2 message)
+// ==========================================================
+message PairingSecretAck {
+  bytes secret = 1;
+}
