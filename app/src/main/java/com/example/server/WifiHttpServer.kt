@@ -135,6 +135,25 @@ class WifiHttpServer(
                     path == "/api/status" -> {
                         serveStatus(output)
                     }
+                    path == "/api/tv-info" -> {
+                        val json = JSONObject().apply {
+                            put("device", "iOControll Android TV")
+                            put("ip", getDeviceIpAddress(context))
+                            put("httpPort", currentConfig.port)
+                            put("socketPort", 23017)
+                        }
+                        sendResponse(output, 200, "OK", "application/json", json.toString().toByteArray())
+                    }
+                    path == "/api/remote" -> {
+                        val cmd = queryParams["cmd"] ?: "PING"
+                        val payload = queryParams["payload"] ?: ""
+                        val handled = onRemoteCommandListener?.invoke(cmd, payload) ?: false
+                        val resp = JSONObject().apply {
+                            put("status", if (handled) "ok" else "accepted")
+                            put("cmd", cmd)
+                        }
+                        sendResponse(output, 200, "OK", "application/json", resp.toString().toByteArray())
+                    }
                     path == "/api/files" -> {
                         val requestedPath = queryParams["path"] ?: "/storage/emulated/0"
                         serveFileListJson(output, requestedPath)
@@ -425,27 +444,34 @@ class WifiHttpServer(
     }
 
     companion object {
+        var onRemoteCommandListener: ((String, String) -> Boolean)? = null
+
         fun getDeviceIpAddress(context: Context): String {
             try {
-                val wifiManager = context.applicationContext.getSystemService(Context.WIFI_SERVICE) as WifiManager
-                val ipInt = wifiManager.connectionInfo.ipAddress
-                if (ipInt != 0) {
-                    return Formatter.formatIpAddress(ipInt)
-                }
-                val interfaces = NetworkInterface.getNetworkInterfaces()
+                val interfaces = NetworkInterface.getNetworkInterfaces() ?: return "127.0.0.1"
+                val candidates = mutableListOf<String>()
+                var wifiOrEthIp: String? = null
+
                 while (interfaces.hasMoreElements()) {
                     val intf = interfaces.nextElement()
+                    if (!intf.isUp || intf.isLoopback) continue
+                    val name = intf.name.lowercase()
                     val addrs = intf.inetAddresses
                     while (addrs.hasMoreElements()) {
                         val addr = addrs.nextElement()
-                        if (!addr.isLoopbackAddress && addr is InetAddress) {
-                            val host = addr.hostAddress ?: ""
-                            if (host.contains(".") && !host.contains(":")) {
-                                return host
+                        if (!addr.isLoopbackAddress && addr is java.net.Inet4Address) {
+                            val host = addr.hostAddress ?: continue
+                            if (host.startsWith("127.")) continue
+                            if (name.startsWith("wlan") || name.startsWith("eth") || name.startsWith("en")) {
+                                wifiOrEthIp = host
+                                break
                             }
+                            candidates.add(host)
                         }
                     }
+                    if (wifiOrEthIp != null) return wifiOrEthIp
                 }
+                if (candidates.isNotEmpty()) return candidates.first()
             } catch (e: Exception) {
                 e.printStackTrace()
             }
