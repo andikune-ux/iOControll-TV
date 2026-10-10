@@ -1,4 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="app_name">iOControll Tv</string>
+    <string name="accessibility_service_desc">Layanan ini memungkinkan kontrol TV dari HP via D-Pad, kursor, dan navigasi.</string>
+    <string name="accessibility_service_label">iOControll Tv Remote Service</string>
 </resources>
