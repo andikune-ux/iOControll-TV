@@ -1,7 +1,4 @@
+<?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="app_name">iOControll Tv</string>
-    <string name="accessibility_service_desc">Layanan Aksesibilitas iOControll Tv untuk mengeksekusi navigasi remote, D-Pad, dan simulasi mouse/kursor pada Android TV.</string>
-    <string name="server_notification_channel">Saluran Server iOControll</string>
-    <string name="server_notification_title">Server Berkas Wi-Fi Aktif</string>
-    <string name="server_notification_text">Server file iOControll Tv sedang berjalan di latar belakang.</string>
 </resources>
