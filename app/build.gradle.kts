@@ -16,7 +16,10 @@ android {
         targetSdk = 34
         versionCode = 4
         versionName = "V1.00.004"
-        vectorDrawables { useSupportLibrary = true }
+
+        vectorDrawables {
+            useSupportLibrary = true
+        }
 
         ksp {
             arg("room.schemaLocation", "$projectDir/schemas")
@@ -35,7 +38,10 @@ android {
     buildTypes {
         release {
             isMinifyEnabled = false
-            proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
+            proguardFiles(
+                getDefaultProguardFile("proguard-android-optimize.txt"),
+                "proguard-rules.pro"
+            )
             signingConfig = signingConfigs.getByName("debugConfig")
         }
         debug {
@@ -48,8 +54,13 @@ android {
         targetCompatibility = JavaVersion.VERSION_17
     }
 
-    kotlinOptions { jvmTarget = "17" }
-    buildFeatures { compose = true }
+    kotlinOptions {
+        jvmTarget = "17"
+    }
+
+    buildFeatures {
+        compose = true
+    }
 
     // ==========================================================
     // PROTOBUF CONFIG — untuk Android TV Remote v2
@@ -85,6 +96,13 @@ android {
             excludes += "/META-INF/io.netty.versions.properties"
         }
     }
+}
+
+// ==========================================================
+// FIX DUPLICATE BOUNCY CASTLE
+// ==========================================================
+configurations.all {
+    exclude(group = "org.bouncycastle", module = "bcprov-jdk15to18")
 }
 
 dependencies {
