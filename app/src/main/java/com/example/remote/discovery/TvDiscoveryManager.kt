@@ -15,11 +15,10 @@ import kotlinx.coroutines.withContext
 /**
  * TvDiscoveryManager — orkestrator semua jenis discovery.
  *
- * Menggabungkan:
- * - MdnsDiscovery (Android TV, Google TV, Apple TV)
- * - SsdpDiscovery (Samsung, LG, Philips, Roku, Vizio)
- *
- * Output: daftar DiscoveredTv yang sudah di-filter (tanpa HP sendiri).
+ * V3 fix:
+ * - Dedup pakai stableKey (brand + name + mac), BUKAN deviceId/IP.
+ * - Prioritaskan entri IPv4 saat merge.
+ * - Filter akhir: hanya yang connectable (IPv4 only).
  */
 class TvDiscoveryManager(
     private val context: Context,
@@ -42,30 +41,42 @@ class TvDiscoveryManager(
     private var timeoutJob: Job? = null
 
     init {
-        // Gabungkan hasil dari kedua discovery
         combineJob = scope.launch {
             combine(
                 mdnsDiscovery.discoveredTvs,
                 ssdpDiscovery.discoveredTvs
             ) { mdns, ssdp ->
-                // Gabungkan, buang duplikat berdasarkan deviceId
                 val merged = mutableMapOf<String, DiscoveredTv>()
-                mdns.forEach { merged[it.deviceId] = it }
-                ssdp.forEach { merged[it.deviceId] = it }
 
-                // Filter HP sendiri + filter hanya TV
+                fun put(tv: DiscoveredTv) {
+                    val key = tv.stableKey
+                    val existing = merged[key]
+                    if (existing == null) {
+                        merged[key] = tv
+                    } else {
+                        val newIsV4 = !tv.ip.contains(":")
+                        val oldIsV4 = !existing.ip.contains(":")
+                        val winner = when {
+                            newIsV4 && !oldIsV4 -> tv
+                            !newIsV4 && oldIsV4 -> existing
+                            else -> if (tv.port > 0 && existing.port == 0) tv else existing
+                        }
+                        merged[key] = winner
+                    }
+                }
+
+                mdns.forEach { put(it) }
+                ssdp.forEach { put(it) }
+
                 val filtered = TvFilter.filterOutSelf(context, merged.values.toList())
                 TvFilter.filterOnlyTvs(filtered)
+                    .filter { it.isConnectable }
             }.collect { list ->
                 _discoveredTvs.value = list
             }
         }
     }
 
-    /**
-     * Mulai scan (mDNS + SSDP bersamaan).
-     * @param durationMs Durasi total scan (default 5 detik).
-     */
     fun startScan(durationMs: Long = 5000L) {
         if (_isScanning.value) return
 
@@ -73,11 +84,9 @@ class TvDiscoveryManager(
         _lastScanAt.value = System.currentTimeMillis()
         _discoveredTvs.value = emptyList()
 
-        // Jalankan kedua scan bersamaan
         mdnsDiscovery.startScan(durationMs)
         ssdpDiscovery.startScan(durationMs)
 
-        // Timer untuk stop otomatis
         timeoutJob?.cancel()
         timeoutJob = scope.launch {
             delay(durationMs + 500)
@@ -99,16 +108,10 @@ class TvDiscoveryManager(
         _discoveredTvs.value = emptyList()
     }
 
-    /**
-     * Cari TV berdasarkan IP.
-     */
     fun findTvByIp(ip: String): DiscoveredTv? {
         return _discoveredTvs.value.firstOrNull { it.ip == ip }
     }
 
-    /**
-     * Cari TV berdasarkan deviceId.
-     */
     fun findTvByDeviceId(deviceId: String): DiscoveredTv? {
         return _discoveredTvs.value.firstOrNull { it.deviceId == deviceId }
     }
