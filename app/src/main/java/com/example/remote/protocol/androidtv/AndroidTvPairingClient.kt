@@ -15,11 +15,8 @@ import javax.net.ssl.SSLSocket
 /**
  * AndroidTvPairingClient — Handle pairing flow Android TV Remote v2.
  *
- * KUNCI PROTOKOL:
- * - client_name di PairingRequest HARUS == CN pada TLS client cert.
- * - Sumber tunggal: TlsHelper.getOrCreateClientName(context).
- * - Format: string deskriptif persisten ("iOControll Tv") —
- *   mengikuti pola tronikos/androidtvremote2 (dipakai Home Assistant).
+ * PENTING: protocol_version = 2 WAJIB dikirim di setiap message.
+ * Field: protocol_version=1, status=2, pairing_request=10, dst.
  */
 class AndroidTvPairingClient(private val context: Context) {
 
@@ -27,7 +24,14 @@ class AndroidTvPairingClient(private val context: Context) {
         private const val TAG = "AtvPairing"
         private const val PORT = 6467
         private const val SERVICE_NAME = "atvremote"
-        private const val CLIENT_ROLE = "1"
+        private const val PROTOCOL_VERSION = 2u
+        private const val STATUS_OK = 200
+
+        // client_role: 1 = INPUT
+        private const val CLIENT_ROLE_INPUT = 1
+
+        // encoding type: 1 = ALPHANUMERIC, 3 = HEXADECIMAL
+        private const val ENC_ALPHANUMERIC = 1
 
         private fun isIpv6(host: String): Boolean = host.contains(":")
 
@@ -42,7 +46,6 @@ class AndroidTvPairingClient(private val context: Context) {
     private var output: DataOutputStream? = null
     private var spake2: Spake2? = null
 
-    /** client_name dari TlsHelper — dijamin sama dengan CN cert. */
     private val clientName: String = TlsHelper.getOrCreateClientName(context)
 
     @Volatile
@@ -66,7 +69,6 @@ class AndroidTvPairingClient(private val context: Context) {
                     } else {
                         "Alamat IPv6 tidak didukung. Pilih TV yang pakai IPv4."
                     }
-                    Log.w(TAG, "Tolak host IPv6: $host")
                     return@withContext false to lastError
                 }
 
@@ -81,10 +83,11 @@ class AndroidTvPairingClient(private val context: Context) {
                 input = DataInputStream(s.getInputStream())
                 output = DataOutputStream(s.getOutputStream())
                 Log.d(TAG, "TLS connected ke $host:$PORT")
-                Log.d(TAG, "client_name='$clientName' (harus == CN cert)")
 
                 // ── 2. Kirim PairingRequest ────────────────────
                 val request = PairingMessageProto.PairingMessage.newBuilder()
+                    .setProtocolVersion(PROTOCOL_VERSION)
+                    .setStatus(STATUS_OK)
                     .setPairingRequest(
                         PairingMessageProto.PairingRequest.newBuilder()
                             .setServiceName(SERVICE_NAME)
@@ -93,7 +96,7 @@ class AndroidTvPairingClient(private val context: Context) {
                     )
                     .build()
                 sendMessage(request)
-                Log.d(TAG, "→ PairingRequest (service=$SERVICE_NAME, client=$clientName)")
+                Log.d(TAG, "→ PairingRequest (proto=$PROTOCOL_VERSION, status=$STATUS_OK, client=$clientName)")
 
                 // ── 3. Baca PairingRequestAck ──────────────────
                 val ack = readMessage()
@@ -104,14 +107,13 @@ class AndroidTvPairingClient(private val context: Context) {
                 }
                 logMessageFields("PairingRequestAck", ack)
 
-                if (ack.status != 0 && ack.status != 200) {
-                    lastError = "TV tolak pairing (status=${ack.status})"
+                if (ack.status != STATUS_OK) {
+                    lastError = "TV tolak (status=${ack.status})"
                     disconnect()
                     return@withContext false to lastError
                 }
-
                 if (!ack.hasPairingRequestAck()) {
-                    lastError = "TV kirim message tidak dikenal (status=${ack.status})"
+                    lastError = "TV kirim message tak dikenal (status=${ack.status})"
                     disconnect()
                     return@withContext false to lastError
                 }
@@ -131,24 +133,27 @@ class AndroidTvPairingClient(private val context: Context) {
                     disconnect()
                     return@withContext false to lastError
                 }
-                val inputEnc  = option.pairingOption.inputEncodings
-                val outputEnc = option.pairingOption.outputEncodings
-                Log.d(TAG, "← PairingOption: input='$inputEnc' output='$outputEnc'")
-
-                val chosen = pickEncoding(inputEnc, outputEnc)
-                Log.d(TAG, "Encoding dipilih: $chosen")
+                Log.d(TAG, "← PairingOption: input=${option.pairingOption.inputEncodingsCount}, output=${option.pairingOption.outputEncodingsCount}")
 
                 // ── 5. Kirim PairingConfiguration ──────────────
+                // Pakai ALPHANUMERIC (kode TV = huruf+angka)
+                val encoding = PairingMessageProto.PairingEncoding.newBuilder()
+                    .setType(ENC_ALPHANUMERIC)
+                    .setSymbolLength(6)
+                    .build()
+
                 val config = PairingMessageProto.PairingMessage.newBuilder()
+                    .setProtocolVersion(PROTOCOL_VERSION)
+                    .setStatus(STATUS_OK)
                     .setPairingConfiguration(
                         PairingMessageProto.PairingConfiguration.newBuilder()
-                            .setEncoding(chosen)
-                            .setClientRole(CLIENT_ROLE)
+                            .setEncoding(encoding)
+                            .setClientRole(CLIENT_ROLE_INPUT)
                             .build()
                     )
                     .build()
                 sendMessage(config)
-                Log.d(TAG, "→ PairingConfiguration (encoding=$chosen, role=$CLIENT_ROLE)")
+                Log.d(TAG, "→ PairingConfiguration (encoding=ALPHANUMERIC, role=INPUT)")
 
                 // ── 6. Baca PairingConfigurationAck ────────────
                 val configAck = readMessage()
@@ -194,6 +199,8 @@ class AndroidTvPairingClient(private val context: Context) {
                 val spakeMsg = s2.start()
 
                 val secretMsg = PairingMessageProto.PairingMessage.newBuilder()
+                    .setProtocolVersion(PROTOCOL_VERSION)
+                    .setStatus(STATUS_OK)
                     .setPairingSecret(
                         PairingMessageProto.PairingSecret.newBuilder()
                             .setSecret(com.google.protobuf.ByteString.copyFrom(spakeMsg))
@@ -257,19 +264,11 @@ class AndroidTvPairingClient(private val context: Context) {
     // INTERNAL
     // ==========================================================
 
-    private fun pickEncoding(inputRaw: String, outputRaw: String): String {
-        val all = (inputRaw + "," + outputRaw)
-            .split(",")
-            .map { it.trim() }
-            .filter { it.isNotEmpty() }
-        all.firstOrNull { it.equals("HEX", ignoreCase = true) }?.let { return "HEX" }
-        return all.firstOrNull() ?: "HEX"
-    }
-
     private fun logMessageFields(label: String, msg: PairingMessageProto.PairingMessage) {
         try {
             val fields = buildString {
-                append("status=").append(msg.status)
+                append("proto=").append(msg.protocolVersion)
+                append(", status=").append(msg.status)
                 if (msg.hasPairingRequest()) append(", request=yes")
                 if (msg.hasPairingRequestAck()) append(", ack=yes")
                 if (msg.hasPairingOption()) append(", option=yes")
