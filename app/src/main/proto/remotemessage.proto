@@ -3,9 +3,6 @@ package remote;
 option java_package = "dev.andikuneiocontroll.remote.protocol.androidtv.proto";
 option java_outer_classname = "RemoteMessageProto";
 
-// ==========================================================
-// MESSAGE TYPES
-// ==========================================================
 message RemoteAppLinkLaunchRequest { string app_link = 1; }
 message RemoteResetPreferredAudioDevice { }
 message RemoteSetPreferredAudioDevice { }
@@ -82,9 +79,6 @@ message RemoteImeKeyInject {
   RemoteTextFieldStatus text_field_status = 2;
 }
 
-// ==========================================================
-// KEYCODE ENUM
-// ==========================================================
 enum RemoteKeyCode {
   KEYCODE_UNKNOWN = 0;
   KEYCODE_SOFT_LEFT = 1;
@@ -377,9 +371,14 @@ enum RemoteKeyCode {
   KEYCODE_PROFILE_SWITCH = 288;
 }
 
-// ==========================================================
-// MAIN WRAPPER
-// ==========================================================
+enum RemoteDirection {
+  UNKNOWN_DIRECTION = 0;
+  SHORT = 1;
+  LONG = 2;
+  START_LONG = 3;
+  END_LONG = 4;
+}
+
 message RemoteMessage {
   RemoteKeyCode remote_key_code = 1;
   RemoteDirection remote_direction = 2;
@@ -395,11 +394,4 @@ message RemoteMessage {
   RemoteImeKeyInject remote_ime_key_inject = 20;
   RemoteImeBatchEdit remote_ime_batch_edit = 21;
   RemoteImeShowRequest remote_ime_show_request = 22;
-}
-
-enum RemoteDirection {
-  SHORT = 1;
-  LONG = 2;
-  START_LONG = 3;
-  END_LONG = 4;
 }
