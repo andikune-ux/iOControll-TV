@@ -164,4 +164,10 @@ dependencies {
     implementation(libs.conscrypt.android)
     implementation(libs.bcprov.jdk18on)
     implementation(libs.bcpkix.jdk18on)
+
+    // ==== TESTING ====
+    testImplementation(libs.junit)
+    testImplementation(libs.androidx.junit)
+    testImplementation(libs.androidx.core)
+    testImplementation(libs.robolectric)
 }

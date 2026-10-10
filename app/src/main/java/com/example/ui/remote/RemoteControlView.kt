@@ -1,4 +1,4 @@
-package com.example.ui.remote
+package dev.andikuneiocontroll.ui.remote
 
 import android.content.Context
 import android.widget.Toast
@@ -80,11 +80,11 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.example.remote.ClientConnectionState
-import com.example.remote.RemoteClient
-import com.example.remote.RemoteSocketServer
-import com.example.remote.TvAccessibilityService
-import com.example.remote.TvReceiverState
+import dev.andikuneiocontroll.remote.ClientConnectionState
+import dev.andikuneiocontroll.remote.RemoteClient
+import dev.andikuneiocontroll.remote.RemoteSocketServer
+import dev.andikuneiocontroll.remote.TvAccessibilityService
+import dev.andikuneiocontroll.remote.TvReceiverState
 
 @Composable
 fun RemoteControlView(

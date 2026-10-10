@@ -16,6 +16,8 @@ import dev.andikuneiocontroll.model.FileCategory
 import dev.andikuneiocontroll.model.FileItem
 import dev.andikuneiocontroll.model.ServerConfig
 import dev.andikuneiocontroll.model.StorageCategoryInfo
+import dev.andikuneiocontroll.remote.RemoteClient
+import dev.andikuneiocontroll.remote.RemoteSocketServer
 import dev.andikuneiocontroll.remote.controller.RemoteController
 import dev.andikuneiocontroll.remote.discovery.DiscoveredTv
 import dev.andikuneiocontroll.remote.discovery.TvDiscoveryManager
@@ -66,6 +68,8 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     // REMOTE TV
     // ==========================================================
 
+    val remoteClient = RemoteClient(context, viewModelScope)
+    val remoteServer = RemoteSocketServer(context, viewModelScope)
     val remoteController = RemoteController(context)
     val tvDiscoveryManager = TvDiscoveryManager(context, viewModelScope)
     val tvRepository = TvRepository(context)
@@ -552,5 +556,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         super.onCleared()
         discoveryManager.stopDiscovery()
         tvDiscoveryManager.destroy()
+        remoteClient.disconnect()
+        remoteServer.stopServer()
     }
 }

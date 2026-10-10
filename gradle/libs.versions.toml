@@ -23,6 +23,9 @@ protobufPlugin = "0.9.4"
 libadb = "3.1.1"
 conscrypt = "2.5.3"
 bcprov = "1.78.1"
+junit = "4.13.2"
+androidxJunit = "1.2.1"
+robolectric = "4.13"
 
 [libraries]
 # AndroidX Core
@@ -81,6 +84,12 @@ libadb-android = { group = "com.github.MuntashirAkon", name = "libadb-android", 
 conscrypt-android = { group = "org.conscrypt", name = "conscrypt-android", version.ref = "conscrypt" }
 bcprov-jdk18on = { group = "org.bouncycastle", name = "bcprov-jdk18on", version.ref = "bcprov" }
 bcpkix-jdk18on = { group = "org.bouncycastle", name = "bcpkix-jdk18on", version.ref = "bcprov" }
+
+# Testing
+junit = { group = "junit", name = "junit", version.ref = "junit" }
+androidx-junit = { group = "androidx.test.ext", name = "junit", version.ref = "androidxJunit" }
+androidx-core = { group = "androidx.test", name = "core", version = "1.6.1" }
+robolectric = { group = "org.robolectric", name = "robolectric", version.ref = "robolectric" }
 
 [plugins]
 android-application = { id = "com.android.application", version.ref = "agp" }

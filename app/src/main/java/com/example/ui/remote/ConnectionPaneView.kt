@@ -1,4 +1,4 @@
-package com.example.ui.remote
+package dev.andikuneiocontroll.ui.remote
 
 import android.widget.Toast
 import androidx.compose.foundation.background
@@ -67,24 +67,24 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.example.model.DevicePeer
-import com.example.remote.ClientConnectionState
-import com.example.remote.RemoteClient
-import com.example.remote.RemoteSocketServer
-import com.example.remote.TvAccessibilityService
-import com.example.remote.TvReceiverState
-import com.example.server.DiscoveryManager
-import com.example.server.WifiHttpServer
-import com.example.ui.theme.DarkBgCard
-import com.example.ui.theme.DarkBgCardElevated
-import com.example.ui.theme.DarkBgPrimary
-import com.example.ui.theme.StabiloCyan
-import com.example.ui.theme.StabiloLime
-import com.example.ui.theme.StabiloPink
-import com.example.ui.theme.StabiloYellow
-import com.example.ui.theme.TextMuted
-import com.example.ui.theme.TextPrimary
-import com.example.ui.theme.TextSecondary
+import dev.andikuneiocontroll.model.DevicePeer
+import dev.andikuneiocontroll.remote.ClientConnectionState
+import dev.andikuneiocontroll.remote.RemoteClient
+import dev.andikuneiocontroll.remote.RemoteSocketServer
+import dev.andikuneiocontroll.remote.TvAccessibilityService
+import dev.andikuneiocontroll.remote.TvReceiverState
+import dev.andikuneiocontroll.server.DiscoveryManager
+import dev.andikuneiocontroll.server.WifiHttpServer
+import dev.andikuneiocontroll.ui.theme.DarkBgCard
+import dev.andikuneiocontroll.ui.theme.DarkBgCardElevated
+import dev.andikuneiocontroll.ui.theme.DarkBgPrimary
+import dev.andikuneiocontroll.ui.theme.StabiloCyan
+import dev.andikuneiocontroll.ui.theme.StabiloLime
+import dev.andikuneiocontroll.ui.theme.StabiloPink
+import dev.andikuneiocontroll.ui.theme.StabiloYellow
+import dev.andikuneiocontroll.ui.theme.TextMuted
+import dev.andikuneiocontroll.ui.theme.TextPrimary
+import dev.andikuneiocontroll.ui.theme.TextSecondary
 
 @Composable
 fun ConnectionPaneView(
@@ -96,8 +96,8 @@ fun ConnectionPaneView(
     val context = LocalContext.current
     val receiverState by remoteServer.receiverState.collectAsState()
     val clientState by remoteClient.connectionState.collectAsState()
-    val discoveredPeers by discoveryManager?.discoveredPeers?.collectAsState() ?: remember { mutableStateOf(emptyList<DevicePeer>()) }
-    val isScanning by discoveryManager?.isScanning?.collectAsState() ?: remember { mutableStateOf(false) }
+    val discoveredPeers = discoveryManager?.discoveredPeers?.collectAsState()?.value ?: emptyList()
+    val isScanning = discoveryManager?.isScanning?.collectAsState()?.value ?: false
 
     val isConnected = clientState.isConnected || receiverState.connectedClient != null
 

@@ -1,8 +1,8 @@
-package com.example.remote
+package dev.andikuneiocontroll.remote
 
 import android.content.Context
 import android.media.AudioManager
-import com.example.server.WifiHttpServer
+import dev.andikuneiocontroll.server.WifiHttpServer
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -51,7 +51,7 @@ class RemoteSocketServer(
 
     init {
         // Wire HTTP fallback endpoint to execute commands received via HTTP REST
-        WifiHttpServer.onRemoteCommandListener = { cmd, payload ->
+        WifiHttpServer.onRemoteCommandListener = { cmd: String, payload: String ->
             val parts = if (payload.isNotEmpty()) listOf(cmd, payload) else listOf(cmd)
             executeCommand(cmd, parts)
             if (_receiverState.value.connectedClient == null) {

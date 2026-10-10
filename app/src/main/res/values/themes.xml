@@ -6,4 +6,5 @@
         <item name="android:windowBackground">#FF0A0F1D</item>
         <item name="android:windowLightStatusBar">false</item>
     </style>
+    <style name="Theme.MyApplication" parent="Theme.IOControllTv" />
 </resources>
