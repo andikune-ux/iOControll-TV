@@ -5,6 +5,8 @@ import android.hardware.Sensor
 import android.hardware.SensorEvent
 import android.hardware.SensorEventListener
 import android.hardware.SensorManager
+import dev.andikuneiocontroll.remote.controller.RemoteController
+import dev.andikuneiocontroll.remote.discovery.DiscoveredTv
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -36,6 +38,9 @@ class RemoteClient(
     private val scope: CoroutineScope
 ) : SensorEventListener {
 
+    private val tvController = RemoteController(context.applicationContext)
+    @Volatile private var usingTvController = false
+
     private var socket: Socket? = null
     private var writer: PrintWriter? = null
     private var reader: BufferedReader? = null
@@ -55,10 +60,48 @@ class RemoteClient(
         pairingCode: String = "",
         onResult: (Boolean, String) -> Unit
     ) {
-        disconnect()
-
         val cleanIp = targetIp.trim()
         val cleanCode = pairingCode.trim()
+
+        disconnect()
+        if (cleanIp.isBlank()) {
+            onResult(false, "Alamat IP TV tidak boleh kosong")
+            return
+        }
+        // Jalur utama: Android TV Remote v2 pada port TLS 6466. Sebelumnya
+        // UI selalu tersambung ke receiver socket aplikasi sendiri (23017).
+        scope.launch {
+            val tv = DiscoveredTv(
+                deviceId = "manual_$cleanIp",
+                name = "Android TV ($cleanIp)",
+                ip = cleanIp,
+                port = 6466,
+                brand = "ANDROID_TV",
+                protocol = "ANDROID_TV_V2"
+            )
+            tvController.connect(tv, cleanCode) { success, message ->
+                if (success) {
+                    usingTvController = true
+                    _connectionState.value = ClientConnectionState(
+                        isConnected = true,
+                        isPaired = true,
+                        targetIp = cleanIp,
+                        targetPort = 6466,
+                        connectionMode = "Android TV Remote v2"
+                    )
+                }
+                onResult(success, message)
+            }
+        }
+    }
+
+    /** Jalur legacy dipertahankan di bawah untuk kompatibilitas receiver lokal. */
+    private fun connectLegacy(
+        targetIp: String,
+        port: Int,
+        pairingCode: String,
+        onResult: (Boolean, String) -> Unit
+    ) {
 
         scope.launch(Dispatchers.IO) {
             val startTime = System.currentTimeMillis()
@@ -166,6 +209,10 @@ class RemoteClient(
 
     fun disconnect() {
         disableAirMouse()
+        if (usingTvController || tvController.isConnected()) {
+            scope.launch { tvController.disconnect() }
+        }
+        usingTvController = false
         try {
             writer?.close()
             reader?.close()
@@ -182,6 +229,17 @@ class RemoteClient(
     fun sendCommand(command: String, payload: String = "") {
         val cur = _connectionState.value
         if (!cur.isConnected) return
+
+        if (usingTvController) {
+            scope.launch {
+                if (!tvController.sendCommand(command, payload)) {
+                    _connectionState.value = _connectionState.value.copy(
+                        errorMessage = "TV tidak menerima perintah"
+                    )
+                }
+            }
+            return
+        }
 
         scope.launch(Dispatchers.IO) {
             val fullMsg = if (payload.isEmpty()) command else "$command|$payload"
@@ -218,6 +276,11 @@ class RemoteClient(
     fun sendMouseMove(dx: Float, dy: Float) {
         val cur = _connectionState.value
         if (!cur.isConnected) return
+
+        if (usingTvController) {
+            scope.launch { tvController.sendCommand("MOUSE_MOVE", "$dx|$dy") }
+            return
+        }
 
         scope.launch(Dispatchers.IO) {
             val w = writer

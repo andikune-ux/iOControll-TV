@@ -314,7 +314,7 @@ class AndroidTvRemoteClient(private val context: Context) : TvProtocol {
 
             TvCommand.VOLUME_UP -> RemoteMessageProto.RemoteKeyCode.KEYCODE_VOLUME_UP
             TvCommand.VOLUME_DOWN -> RemoteMessageProto.RemoteKeyCode.KEYCODE_VOLUME_DOWN
-            TvCommand.VOLUME_MUTE -> RemoteMessageProto.RemoteKeyCode.KEYCODE_VOLUME_MUTE
+            TvCommand.VOLUME_MUTE, "MUTE" -> RemoteMessageProto.RemoteKeyCode.KEYCODE_VOLUME_MUTE
 
             TvCommand.CHANNEL_UP -> RemoteMessageProto.RemoteKeyCode.KEYCODE_CHANNEL_UP
             TvCommand.CHANNEL_DOWN -> RemoteMessageProto.RemoteKeyCode.KEYCODE_CHANNEL_DOWN
@@ -327,6 +327,7 @@ class AndroidTvRemoteClient(private val context: Context) : TvProtocol {
             TvCommand.FORWARD -> RemoteMessageProto.RemoteKeyCode.KEYCODE_MEDIA_FAST_FORWARD
             TvCommand.NEXT -> RemoteMessageProto.RemoteKeyCode.KEYCODE_MEDIA_NEXT
             TvCommand.PREVIOUS -> RemoteMessageProto.RemoteKeyCode.KEYCODE_MEDIA_PREVIOUS
+            TvCommand.VOICE_STOP -> RemoteMessageProto.RemoteKeyCode.KEYCODE_BACK
 
             TvCommand.KEY_DELETE -> RemoteMessageProto.RemoteKeyCode.KEYCODE_DEL
             TvCommand.KEY_ENTER -> RemoteMessageProto.RemoteKeyCode.KEYCODE_ENTER

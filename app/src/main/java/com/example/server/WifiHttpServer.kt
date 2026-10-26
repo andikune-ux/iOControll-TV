@@ -14,11 +14,9 @@ import org.json.JSONArray
 import org.json.JSONObject
 import java.io.BufferedInputStream
 import java.io.BufferedOutputStream
-import java.io.BufferedReader
 import java.io.File
 import java.io.FileInputStream
 import java.io.FileOutputStream
-import java.io.InputStreamReader
 import java.net.InetAddress
 import java.net.NetworkInterface
 import java.net.ServerSocket
@@ -93,10 +91,11 @@ class WifiHttpServer(
         try {
             socket.use { s ->
                 val input = s.getInputStream()
-                val reader = BufferedReader(InputStreamReader(input))
                 val output = BufferedOutputStream(s.getOutputStream())
 
-                val requestLine = reader.readLine() ?: return
+                // BufferedReader bisa membaca sebagian body POST ke buffer internal.
+                // Akibatnya parser upload kehilangan byte awal multipart.
+                val requestLine = readAsciiLine(input) ?: return
                 val parts = requestLine.split(" ")
                 if (parts.size < 2) return
 
@@ -106,7 +105,7 @@ class WifiHttpServer(
                 // Read headers
                 val headers = mutableMapOf<String, String>()
                 var headerLine: String?
-                while (reader.readLine().also { headerLine = it } != null) {
+                while (readAsciiLine(input).also { headerLine = it } != null) {
                     if (headerLine.isNullOrBlank()) break
                     val colonIdx = headerLine!!.indexOf(":")
                     if (colonIdx != -1) {
@@ -169,7 +168,12 @@ class WifiHttpServer(
                             val uploadPath = queryParams["path"] ?: "/storage/emulated/0"
                             val fileName = queryParams["filename"] ?: "upload_${System.currentTimeMillis()}"
                             val contentLength = headers["content-length"]?.toIntOrNull() ?: 0
-                            handleRawFileUpload(input, output, uploadPath, fileName, contentLength)
+                            val contentType = headers["content-type"].orEmpty()
+                            if (contentType.startsWith("multipart/form-data", ignoreCase = true)) {
+                                handleMultipartUpload(input, output, uploadPath, contentType, contentLength)
+                            } else {
+                                handleRawFileUpload(input, output, uploadPath, fileName, contentLength)
+                            }
                         }
                     }
                     else -> {
@@ -195,6 +199,18 @@ class WifiHttpServer(
             }
         }
         return map
+    }
+
+    private fun readAsciiLine(input: java.io.InputStream): String? {
+        val bytes = java.io.ByteArrayOutputStream()
+        while (true) {
+            val value = input.read()
+            if (value < 0) return if (bytes.size() == 0) null else bytes.toString("ISO-8859-1")
+            if (value == '\n'.code) break
+            if (value != '\r'.code) bytes.write(value)
+            if (bytes.size() > 16 * 1024) return null
+        }
+        return bytes.toString("ISO-8859-1")
     }
 
     private fun serveStatus(output: BufferedOutputStream) {
@@ -257,7 +273,7 @@ class WifiHttpServer(
     }
 
     private fun serveFileDownload(output: BufferedOutputStream, filePath: String, rangeHeader: String?) {
-        val file = File(filePath)
+        val file = File(filePath).canonicalFile
         if (!file.exists() || file.isDirectory) {
             sendResponse(output, 404, "Not Found", "text/plain", "File not found".toByteArray())
             return
@@ -267,7 +283,8 @@ class WifiHttpServer(
         if (currentConfig.selectedFiles.isNotEmpty() && !currentConfig.selectedFiles.contains(file.absolutePath)) {
             // check if it's inside one of the selected folders
             val isInside = currentConfig.selectedFiles.any { selected ->
-                file.absolutePath.startsWith(selected)
+                val selectedFile = File(selected).canonicalFile
+                file.path == selectedFile.path || file.path.startsWith(selectedFile.path + File.separator)
             }
             if (!isInside) {
                 sendResponse(output, 403, "Forbidden", "text/plain", "File not shared".toByteArray())
@@ -281,8 +298,12 @@ class WifiHttpServer(
 
         val isRange = rangeHeader != null && rangeHeader.startsWith("bytes=")
         if (isRange) {
-            val range = rangeHeader!!.substring(6).split("-")
+            val range = rangeHeader!!.substring(6).split("-", limit = 2)
             start = range[0].toLongOrNull() ?: 0L
+            if (start < 0L || start >= totalLength) {
+                sendResponse(output, 416, "Range Not Satisfiable", "text/plain", "Invalid range".toByteArray())
+                return
+            }
             if (range.size > 1 && range[1].isNotEmpty()) {
                 end = range[1].toLongOrNull() ?: end
             }
@@ -329,7 +350,19 @@ class WifiHttpServer(
         fileName: String,
         length: Int
     ) {
-        val destFile = File(uploadDir, fileName)
+        val directory = File(uploadDir).canonicalFile
+        if (!directory.exists() && !directory.mkdirs()) {
+            sendResponse(output, 400, "Bad Request", "text/plain", "Folder upload tidak tersedia".toByteArray())
+            return
+        }
+        val safeName = fileName.substringAfterLast('/').substringAfterLast('\\')
+            .replace(Regex("[\\u0000-\\u001F]"), "_")
+            .ifBlank { "upload_${System.currentTimeMillis()}" }
+        val destFile = File(directory, safeName).canonicalFile
+        if (destFile.parentFile?.path != directory.path || length <= 0) {
+            sendResponse(output, 400, "Bad Request", "text/plain", "Upload tidak valid".toByteArray())
+            return
+        }
         FileOutputStream(destFile).use { fos ->
             val buffer = ByteArray(64 * 1024)
             var bytesLeft = length
@@ -340,7 +373,70 @@ class WifiHttpServer(
                 bytesLeft -= read
             }
         }
-        sendResponse(output, 200, "OK", "application/json", "{\"status\":\"success\",\"file\":\"$fileName\"}".toByteArray())
+        sendResponse(output, 200, "OK", "application/json", "{\"status\":\"success\",\"file\":\"$safeName\"}".toByteArray())
+    }
+
+    private fun handleMultipartUpload(
+        input: java.io.InputStream,
+        output: BufferedOutputStream,
+        uploadDir: String,
+        contentType: String,
+        length: Int
+    ) {
+        val boundary = Regex("boundary=([^;]+)", RegexOption.IGNORE_CASE)
+            .find(contentType)?.groupValues?.getOrNull(1)?.trim()?.trim('"')
+        if (boundary.isNullOrBlank() || length <= 0) {
+            sendResponse(output, 400, "Bad Request", "text/plain", "Multipart tidak valid".toByteArray())
+            return
+        }
+        val body = ByteArray(length)
+        var offset = 0
+        while (offset < length) {
+            val read = input.read(body, offset, length - offset)
+            if (read <= 0) break
+            offset += read
+        }
+        val marker = "--$boundary".toByteArray(Charsets.ISO_8859_1)
+        val start = body.indexOfBytes(marker)
+        val headerSeparator = "\r\n\r\n".toByteArray(Charsets.ISO_8859_1)
+        val headerEnd = if (start >= 0) body.indexOfBytes(headerSeparator, start) else -1
+        val endMarker = "\r\n--$boundary".toByteArray(Charsets.ISO_8859_1)
+        val dataStart = headerEnd + headerSeparator.size
+        val dataEnd = if (headerEnd >= 0) body.indexOfBytes(endMarker, dataStart) else -1
+        if (start < 0 || headerEnd < 0 || dataEnd < dataStart) {
+            sendResponse(output, 400, "Bad Request", "text/plain", "Part file tidak ditemukan".toByteArray())
+            return
+        }
+        val partHeaders = String(body, start, headerEnd - start, Charsets.ISO_8859_1)
+        val fileName = Regex("filename=\"([^\"]*)\"", RegexOption.IGNORE_CASE)
+            .find(partHeaders)?.groupValues?.getOrNull(1).orEmpty()
+        val directory = File(uploadDir).canonicalFile
+        val safeName = fileName.substringAfterLast('/').substringAfterLast('\\')
+            .replace(Regex("[\\u0000-\\u001F]"), "_")
+        val dest = File(directory, safeName).canonicalFile
+        if (fileName.isBlank() || dest.parentFile?.path != directory.path) {
+            sendResponse(output, 400, "Bad Request", "text/plain", "Nama file tidak valid".toByteArray())
+            return
+        }
+        if (!directory.exists() && !directory.mkdirs()) {
+            sendResponse(output, 400, "Bad Request", "text/plain", "Folder upload tidak tersedia".toByteArray())
+            return
+        }
+        FileOutputStream(dest).use { it.write(body, dataStart, dataEnd - dataStart) }
+        sendResponse(output, 200, "OK", "application/json", "{\"status\":\"success\",\"file\":\"$safeName\"}".toByteArray())
+    }
+
+    private fun ByteArray.indexOfBytes(needle: ByteArray, fromIndex: Int = 0): Int {
+        if (needle.isEmpty()) return fromIndex
+        if (size < needle.size) return -1
+        for (i in fromIndex..(size - needle.size)) {
+            var matches = true
+            for (j in needle.indices) {
+                if (this[i + j] != needle[j]) { matches = false; break }
+            }
+            if (matches) return i
+        }
+        return -1
     }
 
     private fun serveWebPage(output: BufferedOutputStream, currentDir: String) {

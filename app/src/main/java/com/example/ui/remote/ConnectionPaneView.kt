@@ -432,7 +432,7 @@ private fun Tahap1BelumTerhubung(
                 OutlinedTextField(
                     value = inputCode,
                     onValueChange = { inputCode = it },
-                    label = { Text("4-Digit Kode Pairing TV (Kosongkan jika Bebas PIN)") },
+                    label = { Text("Kode Pairing Android TV (6 digit)") },
                     singleLine = true,
                     colors = OutlinedTextFieldDefaults.colors(
                         focusedBorderColor = StabiloLime,
