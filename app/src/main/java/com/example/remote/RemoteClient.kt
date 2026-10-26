@@ -115,13 +115,13 @@ class RemoteClient(
                 s.tcpNoDelay = true
                 s.keepAlive = true
                 s.soTimeout = 4000
-                s.connect(InetSocketAddress(cleanIp, port), 3500)
+                s.connect(InetSocketAddress(targetIp, port), 3500)
 
                 val w = PrintWriter(s.getOutputStream(), true)
                 val r = BufferedReader(InputStreamReader(s.getInputStream()))
 
                 // Kirim perintah PAIR
-                w.println("PAIR|$cleanCode")
+                w.println("PAIR|$pairingCode")
                 w.flush()
 
                 val response = r.readLine()?.trim()
@@ -137,12 +137,12 @@ class RemoteClient(
                         _connectionState.value = ClientConnectionState(
                             isConnected = true,
                             isPaired = true,
-                            targetIp = cleanIp,
+                            targetIp = targetIp,
                             targetPort = port,
                             connectionMode = "TCP Socket (Cepat)",
                             latencyMs = latency
                         )
-                        onResult(true, "Berhasil terhubung ke TV ($cleanIp) via TCP Socket!")
+                        onResult(true, "Berhasil terhubung ke TV ($targetIp) via TCP Socket!")
                     }
                 } else if (response != null && response.startsWith("PAIR_FAILED")) {
                     s.close()
@@ -166,7 +166,7 @@ class RemoteClient(
 
             // 2. Fallback Otomatis: HTTP REST di port 23016 jika TCP Socket diblokir router
             try {
-                val httpUrl = "http://$cleanIp:23016/api/remote?cmd=PAIR&payload=${URLEncoder.encode(cleanCode, "UTF-8")}"
+                val httpUrl = "http://$targetIp:23016/api/remote?cmd=PAIR&payload=${URLEncoder.encode(pairingCode, "UTF-8")}"
                 val connection = (URL(httpUrl).openConnection() as HttpURLConnection).apply {
                     connectTimeout = 3000
                     readTimeout = 3000
@@ -180,12 +180,12 @@ class RemoteClient(
                         _connectionState.value = ClientConnectionState(
                             isConnected = true,
                             isPaired = true,
-                            targetIp = cleanIp,
+                            targetIp = targetIp,
                             targetPort = 23016,
                             connectionMode = "HTTP LAN (Stabil)",
                             latencyMs = latency
                         )
-                        onResult(true, "Terhubung ke TV ($cleanIp) via Saluran HTTP LAN!")
+                        onResult(true, "Terhubung ke TV ($targetIp) via Saluran HTTP LAN!")
                     }
                     return@launch
                 }
@@ -201,7 +201,7 @@ class RemoteClient(
                 )
                 onResult(
                     false,
-                    "Gagal terhubung ke $cleanIp. Pastikan HP dan TV di Wi-Fi yang sama dan aplikasi di TV terbuka."
+                    "Gagal terhubung ke $targetIp. Pastikan HP dan TV di Wi-Fi yang sama dan aplikasi di TV terbuka."
                 )
             }
         }
